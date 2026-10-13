@@ -1,0 +1,35 @@
+# Binaries
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Go
+backend/vendor/
+*.test
+*.out
+go.work.sum
+
+# Environment
+.env
+.env.local
+
+# Logs
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node/Vue
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Misc
+.DS_Store
+coverage/
