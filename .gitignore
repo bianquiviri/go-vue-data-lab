@@ -15,9 +15,13 @@ go.work.sum
 .env
 .env.local
 
+# TLS certificates (generated locally via deploy/gen-certs.sh — never commit)
+deploy/certs/
+
 # Logs
 logs/
 *.log
+backend/logs/
 
 # IDE
 .vscode/

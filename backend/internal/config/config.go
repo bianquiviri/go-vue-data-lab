@@ -8,22 +8,22 @@ import (
 )
 
 type Config struct {
-	DBHost           string
-	DBPort           string
-	DBUser           string
-	DBPassword       string
-	DBSourceName     string
-	DBTargetName     string
-	ServerPort       string
-	ServerHost       string
-	AppEnv           string
-	AppURL           string
-	JWTSecret        string
-	JWTExpiryHours   int
+	DBHost                 string
+	DBPort                 string
+	DBUser                 string
+	DBPassword             string
+	DBSourceName           string
+	DBTargetName           string
+	ServerPort             string
+	ServerHost             string
+	AppEnv                 string
+	AppURL                 string
+	JWTSecret              string
+	JWTExpiryHours         int
 	BootstrapAdminEmail    string
 	BootstrapAdminPassword string
-	LogLevel         string
-	LogPath          string
+	LogLevel               string
+	LogPath                string
 }
 
 func Load() (*Config, error) {

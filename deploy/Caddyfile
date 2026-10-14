@@ -1,4 +1,27 @@
+# Caddy reverse proxy for the local development environment.
+#
+# TLS strategy: mkcert-generated certificates mounted from ./certs (read-only).
+# mkcert installs a locally-trusted root CA, so browsers show a valid padlock
+# for https://godata.josebianco.local without warnings.
+#
+# Generate the certificates once with:
+#     make certs          # or: ./deploy/gen-certs.sh
+#
+# NOTE: the backend runs on the HOST (make run), not inside the compose network,
+# so we proxy to host.docker.internal (resolved via extra_hosts in compose).
+# localhost would incorrectly point at the Caddy container itself.
+
 godata.josebianco.local {
-    reverse_proxy localhost:8080
-    tls internal
+	encode zstd gzip
+
+	reverse_proxy host.docker.internal:8080 {
+		header_up X-Real-IP {remote_host}
+	}
+
+	tls /certs/godata.josebianco.local.pem /certs/godata.josebianco.local-key.pem
+
+	log {
+		output stdout
+		format console
+	}
 }

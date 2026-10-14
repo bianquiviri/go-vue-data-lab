@@ -1,18 +1,39 @@
-version: '3.8'
+# Local development environment for Go Concurrent Data Processing Lab.
+#
+# Services:
+#   - postgres : PostgreSQL 15 with two application databases (lab_source, lab_target)
+#                created by init-db.sh on first boot.
+#   - caddy    : local reverse proxy / TLS terminator for https://godata.josebianco.local
+#                forwarding to the backend running on the HOST (make run -> :8080).
+#
+# The backend is intentionally NOT part of this compose file: it runs on the host.
+#
+# Values fall back to safe local defaults and can be overridden through the
+# (git-ignored) `deploy/.env` file or the shell environment. Never commit secrets.
 
 services:
   postgres:
     image: postgres:15-alpine
     container_name: lab_postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_MULTIPLE_DATABASES: lab_source,lab_target
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+    # Bound to loopback only: the DB is reachable by the host backend, but not
+    # exposed to the LAN/internet.
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+      - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres}
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - lab_network
     restart: unless-stopped
@@ -23,14 +44,20 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    # Lets the container reach services running on the host (Linux needs the
+    # explicit host-gateway mapping; Docker Desktop on macOS already provides it).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./certs:/certs:ro
       - caddy_data:/data
       - caddy_config:/config
     networks:
       - lab_network
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
