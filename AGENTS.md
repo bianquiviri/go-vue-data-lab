@@ -47,6 +47,6 @@ make swagger
 ## Reglas de agentes
 - Equipo definido en `.opencode/agent/`: `orchestrator` (primary), `backend-go`,
   `frontend-vue`, `qa-testing`, `devops`.
-- **Publicación**: solo el usuario autoriza `git push` / PRs / releases. Los agentes
-  tienen `git push` denegado por permisos.
+- **Publicación**: el usuario autoriza `git push` / PRs. Los agentes pueden
+  ejecutarlos cuando el usuario lo pida explícitamente; `gh release` sigue denegado.
 - Al cerrar un bloque de trabajo, actualizar `docs/MEMORY.md` (o usar `/remember`).

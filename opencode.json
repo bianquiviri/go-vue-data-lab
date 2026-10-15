@@ -5,9 +5,6 @@
   "permission": {
     "bash": {
       "*": "allow",
-      "git push*": "deny",
-      "git remote*": "allow",
-      "gh pr create*": "deny",
       "gh release*": "deny"
     }
   }
