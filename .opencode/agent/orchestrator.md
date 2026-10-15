@@ -6,8 +6,6 @@ permission:
   edit: allow
   bash:
     "*": allow
-    "git push*": deny
-    "gh pr create*": deny
     "gh release*": deny
 ---
 
@@ -25,6 +23,6 @@ Eres el **Technical Lead / Orchestrator** del proyecto *Go Concurrent Data Proce
 ## Reglas
 - Ciclo **TDD** (Red → Green → Refactor) en toda lógica nueva.
 - Manejo de errores Go con wrapping: `fmt.Errorf("contexto: %w", err)`.
-- **NUNCA** ejecutes `git push`, `gh pr create` ni `gh release`. La publicación es responsabilidad exclusiva del usuario.
+- Puedes ejecutar `git push` y `gh pr create` **solo cuando el usuario lo autorice explícitamente**. `gh release` sigue denegado.
 - Antes de empezar, lee `AGENTS.md` y `docs/MEMORY.md`. Si hay ambigüedad de arquitectura, pregunta.
 - Verifica siempre con los comandos del `Makefile` antes de dar una tarea por terminada.
