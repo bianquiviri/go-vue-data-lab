@@ -1,0 +1,1343 @@
+basePath: /api/v1
+definitions:
+  handler.AnalyticsListResponse:
+    properties:
+      data: {}
+      meta:
+        $ref: '#/definitions/handler.LimitMeta'
+    type: object
+  handler.ErrorBody:
+    properties:
+      code:
+        type: string
+      details:
+        additionalProperties: {}
+        type: object
+      message:
+        type: string
+    type: object
+  handler.ErrorResponse:
+    properties:
+      error:
+        $ref: '#/definitions/handler.ErrorBody'
+    type: object
+  handler.HealthResponse:
+    properties:
+      status:
+        type: string
+      time:
+        type: string
+      version:
+        type: string
+    type: object
+  handler.JobProgressEnvelope:
+    properties:
+      data:
+        $ref: '#/definitions/jobs.Progress'
+    type: object
+  handler.JobStartEnvelope:
+    properties:
+      data:
+        $ref: '#/definitions/handler.JobStartResponse'
+    type: object
+  handler.JobStartResponse:
+    properties:
+      job_id:
+        type: string
+      status:
+        type: string
+      type:
+        type: string
+    type: object
+  handler.JobStatusEnvelope:
+    properties:
+      data:
+        $ref: '#/definitions/jobs.JobStatus'
+    type: object
+  handler.JobStopEnvelope:
+    properties:
+      data:
+        $ref: '#/definitions/handler.JobStopResponse'
+    type: object
+  handler.JobStopResponse:
+    properties:
+      stopped:
+        type: boolean
+    type: object
+  handler.LimitMeta:
+    properties:
+      limit:
+        type: integer
+    type: object
+  handler.PageMeta:
+    properties:
+      page:
+        type: integer
+      per_page:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+  handler.PaginatedResponse:
+    properties:
+      data: {}
+      meta:
+        $ref: '#/definitions/handler.PageMeta'
+    type: object
+  handler.ScheduleEnvelope:
+    properties:
+      data:
+        $ref: '#/definitions/models.CronSchedule'
+    type: object
+  handler.ScheduleListEnvelope:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/models.CronSchedule'
+        type: array
+    type: object
+  handler.ScheduleRunEnvelope:
+    properties:
+      data:
+        $ref: '#/definitions/handler.ScheduleRunResponse'
+    type: object
+  handler.ScheduleRunResponse:
+    properties:
+      job_id:
+        type: string
+    type: object
+  jobs.EntityProgress:
+    properties:
+      done:
+        type: integer
+      entity:
+        type: string
+      failed:
+        type: integer
+      percent:
+        type: number
+      processed:
+        type: integer
+      skipped:
+        type: integer
+      total:
+        type: integer
+    type: object
+  jobs.GenerateParams:
+    properties:
+      batch_size:
+        type: integer
+      customers:
+        type: integer
+      max_items:
+        type: integer
+      min_items:
+        type: integer
+      orders:
+        type: integer
+      products:
+        type: integer
+      reset:
+        type: boolean
+      seed:
+        type: integer
+      skip_if_exists:
+        type: boolean
+    type: object
+  jobs.JobStatus:
+    properties:
+      error:
+        type: string
+      finished_at:
+        type: string
+      id:
+        type: string
+      progress:
+        $ref: '#/definitions/jobs.Progress'
+      running:
+        type: boolean
+      started_at:
+        type: string
+      status:
+        $ref: '#/definitions/jobs.Status'
+      type:
+        type: string
+    type: object
+  jobs.MigrateParams:
+    properties:
+      batch_size:
+        type: integer
+      entities:
+        items:
+          type: string
+        type: array
+      extract_size:
+        type: integer
+      fail_fast:
+        type: boolean
+      strict_totals:
+        type: boolean
+      workers:
+        type: integer
+    type: object
+  jobs.Progress:
+    properties:
+      entities:
+        items:
+          $ref: '#/definitions/jobs.EntityProgress'
+        type: array
+      failed:
+        type: integer
+      job_id:
+        type: string
+      job_type:
+        type: string
+      percent:
+        type: number
+      processed:
+        type: integer
+      skipped:
+        type: integer
+      status:
+        $ref: '#/definitions/jobs.Status'
+    type: object
+  jobs.Status:
+    enum:
+    - pending
+    - running
+    - completed
+    - failed
+    - stopped
+    - idle
+    type: string
+    x-enum-varnames:
+    - StatusPending
+    - StatusRunning
+    - StatusCompleted
+    - StatusFailed
+    - StatusStopped
+    - StatusIdle
+  models.AnalyticsSummary:
+    properties:
+      average_order_value:
+        type: number
+      orders_by_status:
+        items:
+          $ref: '#/definitions/models.OrderStatusCount'
+        type: array
+      total_customers:
+        type: integer
+      total_orders:
+        type: integer
+      total_products:
+        type: integer
+      total_revenue:
+        type: number
+    type: object
+  models.CronSchedule:
+    properties:
+      command:
+        type: string
+      created_at:
+        type: string
+      cron_expr:
+        type: string
+      enabled:
+        type: boolean
+      id:
+        type: string
+      last_run_at:
+        type: string
+      name:
+        type: string
+      next_run_at:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  models.Customer:
+    properties:
+      city:
+        type: string
+      country_code:
+        type: string
+      created_at:
+        type: string
+      email:
+        type: string
+      first_name:
+        type: string
+      id:
+        type: string
+      last_name:
+        type: string
+      state:
+        type: string
+    type: object
+  models.Order:
+    properties:
+      currency:
+        type: string
+      customer:
+        $ref: '#/definitions/models.Customer'
+      customer_id:
+        type: string
+      id:
+        type: string
+      order_date:
+        type: string
+      order_items:
+        items:
+          $ref: '#/definitions/models.OrderItem'
+        type: array
+      order_number:
+        type: string
+      shipping_address:
+        type: object
+      status:
+        type: string
+      total_amount:
+        type: number
+    type: object
+  models.OrderItem:
+    properties:
+      id:
+        type: integer
+      order:
+        $ref: '#/definitions/models.Order'
+      order_id:
+        type: string
+      product:
+        $ref: '#/definitions/models.Product'
+      product_id:
+        type: string
+      quantity:
+        type: integer
+      subtotal:
+        type: number
+      unit_price:
+        type: number
+    type: object
+  models.OrderStatusCount:
+    properties:
+      count:
+        type: integer
+      status:
+        type: string
+    type: object
+  models.Product:
+    properties:
+      category:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      price:
+        type: number
+      sku:
+        type: string
+      status:
+        type: string
+      stock:
+        type: integer
+    type: object
+  scheduler.CreateParams:
+    properties:
+      command:
+        type: string
+      cron_expr:
+        type: string
+      enabled:
+        description: Enabled defaults to true when omitted.
+        type: boolean
+      name:
+        type: string
+    required:
+    - command
+    - cron_expr
+    - name
+    type: object
+  scheduler.UpdateParams:
+    properties:
+      command:
+        type: string
+      cron_expr:
+        type: string
+      enabled:
+        type: boolean
+      name:
+        type: string
+    required:
+    - command
+    - cron_expr
+    - name
+    type: object
+info:
+  contact: {}
+  description: REST API for the Go Concurrent Data Processing Lab, a concurrent data
+    processing and synthetic e-commerce analytics platform.
+  title: Go Concurrent Data Processing Lab API
+  version: "1.0"
+paths:
+  /health:
+    get:
+      description: Liveness/readiness probe reporting status, time and build version.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HealthResponse'
+      summary: Health check
+      tags:
+      - health
+  /jobs/generate/start:
+    post:
+      consumes:
+      - application/json
+      description: Launches synthetic data generation into lab_source. Only one job
+        may run at a time.
+      parameters:
+      - description: Generation parameters (defaults applied when omitted)
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/jobs.GenerateParams'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/handler.JobStartEnvelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Start a data generation job
+      tags:
+      - jobs
+  /jobs/history:
+    get:
+      description: Paginated job executions from lab_target, newest first.
+      parameters:
+      - description: Page number (1-based)
+        in: query
+        minimum: 1
+        name: page
+        type: integer
+      - description: Items per page (max 100)
+        in: query
+        maximum: 100
+        minimum: 1
+        name: per_page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.PaginatedResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Job execution history
+      tags:
+      - jobs
+  /jobs/migrate/start:
+    post:
+      consumes:
+      - application/json
+      description: Launches the lab_source -> lab_target migration. Only one job may
+        run at a time.
+      parameters:
+      - description: Migration parameters (defaults applied when omitted)
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/jobs.MigrateParams'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/handler.JobStartEnvelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Start an ETL migration job
+      tags:
+      - jobs
+  /jobs/progress:
+    get:
+      description: Returns per-entity progress, overall percent and processed/failed
+        counters.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.JobProgressEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Real-time job progress
+      tags:
+      - jobs
+  /jobs/status:
+    get:
+      description: Returns the snapshot of the current (or last) job, or an idle status.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.JobStatusEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Current job status
+      tags:
+      - jobs
+  /jobs/stop:
+    post:
+      description: Cancels the currently running job; its status becomes stopped.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.JobStopEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Stop the running job
+      tags:
+      - jobs
+  /scheduler/jobs:
+    get:
+      description: Returns every cron schedule persisted in lab_target.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ScheduleListEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: List cron schedules
+      tags:
+      - scheduler
+    post:
+      consumes:
+      - application/json
+      description: Creates a schedule; the cron expression is validated and next_run_at
+        computed.
+      parameters:
+      - description: Schedule definition
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/scheduler.CreateParams'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handler.ScheduleEnvelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Create a cron schedule
+      tags:
+      - scheduler
+  /scheduler/jobs/{id}:
+    delete:
+      description: Removes a schedule and unregisters it from the cron runner.
+      parameters:
+      - description: Schedule UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Delete a cron schedule
+      tags:
+      - scheduler
+    put:
+      consumes:
+      - application/json
+      description: Replaces a schedule's fields and recomputes next_run_at.
+      parameters:
+      - description: Schedule UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Schedule definition
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/scheduler.UpdateParams'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ScheduleEnvelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Update a cron schedule
+      tags:
+      - scheduler
+  /scheduler/jobs/{id}/disable:
+    post:
+      description: Turns a schedule off and unregisters it from the cron runner.
+      parameters:
+      - description: Schedule UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ScheduleEnvelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Disable a cron schedule
+      tags:
+      - scheduler
+  /scheduler/jobs/{id}/enable:
+    post:
+      description: Turns a schedule on and registers it with the cron runner.
+      parameters:
+      - description: Schedule UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ScheduleEnvelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Enable a cron schedule
+      tags:
+      - scheduler
+  /scheduler/jobs/{id}/run:
+    post:
+      description: Triggers the schedule immediately and returns the started job id.
+      parameters:
+      - description: Schedule UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ScheduleRunEnvelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Run a cron schedule now
+      tags:
+      - scheduler
+  /source/customers:
+    get:
+      description: Paginated customers from lab_source, searchable by name/email and
+        filterable by country.
+      parameters:
+      - description: Page number (1-based)
+        in: query
+        minimum: 1
+        name: page
+        type: integer
+      - description: Items per page (max 100)
+        in: query
+        maximum: 100
+        minimum: 1
+        name: per_page
+        type: integer
+      - description: Search by first name, last name or email
+        in: query
+        name: search
+        type: string
+      - description: ISO 3166-1 alpha-2 country code
+        in: query
+        name: country
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.PaginatedResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: List source customers
+      tags:
+      - source
+  /source/customers/{id}:
+    get:
+      description: Returns a single customer from lab_source by id.
+      parameters:
+      - description: Customer UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Customer'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Get a source customer
+      tags:
+      - source
+  /source/order-items:
+    get:
+      description: Paginated order items from lab_source, filterable by order and
+        product.
+      parameters:
+      - description: Page number (1-based)
+        in: query
+        minimum: 1
+        name: page
+        type: integer
+      - description: Items per page (max 100)
+        in: query
+        maximum: 100
+        minimum: 1
+        name: per_page
+        type: integer
+      - description: Filter by order UUID
+        in: query
+        name: order_id
+        type: string
+      - description: Filter by product UUID
+        in: query
+        name: product_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.PaginatedResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: List source order items
+      tags:
+      - source
+  /source/orders:
+    get:
+      description: Paginated orders from lab_source, filterable by customer, status
+        and order_date range.
+      parameters:
+      - description: Page number (1-based)
+        in: query
+        minimum: 1
+        name: page
+        type: integer
+      - description: Items per page (max 100)
+        in: query
+        maximum: 100
+        minimum: 1
+        name: per_page
+        type: integer
+      - description: Filter by customer UUID
+        in: query
+        name: customer_id
+        type: string
+      - description: Filter by order status
+        in: query
+        name: status
+        type: string
+      - description: Order date >= (RFC3339 or YYYY-MM-DD)
+        in: query
+        name: date_from
+        type: string
+      - description: Order date <= (RFC3339 or YYYY-MM-DD)
+        in: query
+        name: date_to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.PaginatedResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: List source orders
+      tags:
+      - source
+  /source/orders/{id}:
+    get:
+      description: Returns a single order from lab_source by id, including its order
+        items.
+      parameters:
+      - description: Order UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Order'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Get a source order with items
+      tags:
+      - source
+  /source/products:
+    get:
+      description: Paginated products from lab_source, searchable by name/SKU and
+        filterable by category.
+      parameters:
+      - description: Page number (1-based)
+        in: query
+        minimum: 1
+        name: page
+        type: integer
+      - description: Items per page (max 100)
+        in: query
+        maximum: 100
+        minimum: 1
+        name: per_page
+        type: integer
+      - description: Search by name or SKU
+        in: query
+        name: search
+        type: string
+      - description: Filter by category
+        in: query
+        name: category
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.PaginatedResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: List source products
+      tags:
+      - source
+  /source/products/{id}:
+    get:
+      description: Returns a single product from lab_source by id.
+      parameters:
+      - description: Product UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Product'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Get a source product
+      tags:
+      - source
+  /target/analytics/summary:
+    get:
+      description: 'Aggregate snapshot of lab_target: entity counts, revenue totals,
+        average order value and orders grouped by status.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.AnalyticsSummary'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Analytics summary
+      tags:
+      - analytics
+  /target/analytics/top-customers:
+    get:
+      description: Ranks customers by total spent and order count in lab_target. Supports
+        a limit query param (default 10, max 100).
+      parameters:
+      - description: Maximum number of customers (default 10, max 100)
+        in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.AnalyticsListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Top customers by spend
+      tags:
+      - analytics
+  /target/analytics/top-products:
+    get:
+      description: Ranks products by total revenue and units sold in lab_target. Supports
+        a limit query param (default 10, max 100).
+      parameters:
+      - description: Maximum number of products (default 10, max 100)
+        in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.AnalyticsListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Top products by revenue
+      tags:
+      - analytics
+  /target/customers:
+    get:
+      description: Paginated customers from lab_target, searchable by name/email and
+        filterable by country.
+      parameters:
+      - description: Page number (1-based)
+        in: query
+        minimum: 1
+        name: page
+        type: integer
+      - description: Items per page (max 100)
+        in: query
+        maximum: 100
+        minimum: 1
+        name: per_page
+        type: integer
+      - description: Search by first name, last name or email
+        in: query
+        name: search
+        type: string
+      - description: ISO 3166-1 alpha-2 country code
+        in: query
+        name: country
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.PaginatedResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: List target customers
+      tags:
+      - target
+  /target/customers/{id}:
+    get:
+      description: Returns a single customer from lab_target by id.
+      parameters:
+      - description: Customer UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Customer'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Get a target customer
+      tags:
+      - target
+  /target/orders:
+    get:
+      description: Paginated orders from lab_target, filterable by customer, status
+        and order_date range.
+      parameters:
+      - description: Page number (1-based)
+        in: query
+        minimum: 1
+        name: page
+        type: integer
+      - description: Items per page (max 100)
+        in: query
+        maximum: 100
+        minimum: 1
+        name: per_page
+        type: integer
+      - description: Filter by customer UUID
+        in: query
+        name: customer_id
+        type: string
+      - description: Filter by order status
+        in: query
+        name: status
+        type: string
+      - description: Order date >= (RFC3339 or YYYY-MM-DD)
+        in: query
+        name: date_from
+        type: string
+      - description: Order date <= (RFC3339 or YYYY-MM-DD)
+        in: query
+        name: date_to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.PaginatedResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: List target orders
+      tags:
+      - target
+  /target/orders/{id}:
+    get:
+      description: Returns a single order from lab_target by id, including its order
+        items.
+      parameters:
+      - description: Order UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Order'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Get a target order with items
+      tags:
+      - target
+  /target/products:
+    get:
+      description: Paginated products from lab_target, searchable by name/SKU and
+        filterable by category.
+      parameters:
+      - description: Page number (1-based)
+        in: query
+        minimum: 1
+        name: page
+        type: integer
+      - description: Items per page (max 100)
+        in: query
+        maximum: 100
+        minimum: 1
+        name: per_page
+        type: integer
+      - description: Search by name or SKU
+        in: query
+        name: search
+        type: string
+      - description: Filter by category
+        in: query
+        name: category
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.PaginatedResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: List target products
+      tags:
+      - target
+  /target/products/{id}:
+    get:
+      description: Returns a single product from lab_target by id.
+      parameters:
+      - description: Product UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Product'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Get a target product
+      tags:
+      - target
+schemes:
+- http
+- https
+swagger: "2.0"
