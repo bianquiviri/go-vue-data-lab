@@ -4,19 +4,30 @@ Memoria viva del proyecto. Se carga en cada sesión de opencode.
 Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo.
 
 ## Estado actual
-- **Issue #1 (infra local) completa y validada**: `deploy/docker-compose.yml` (postgres:15-alpine + caddy:2-alpine,
-  healthcheck `pg_isready`, `extra_hosts` host-gateway, red `lab_network`), `deploy/Caddyfile`
-  (TLS mkcert montado → `host.docker.internal:8080`), `deploy/init-db.sh` idempotente (lab_source/lab_target),
-  `deploy/gen-certs.sh`, `deploy/certs/` git-ignorado.
-- Backend ejecutable: `backend/cmd/api/main.go`, config, router, handler health, DB (lab_source/lab_target),
-  logger zap+lumberjack, middleware. Migraciones SQL source/target UP/DOWN.
-- **Issue #6 (auth) completa**: `internal/auth` (Argon2id `Hash`/`Verify` + `JWTManager` access/refresh HS256),
-  `internal/repository/auth.go` (`UserRepository` GORM + `EnsureUser` transaccional), `internal/service/auth.go`
-  (login/refresh/me/change-password/logout) y `bootstrap.go` (`BootstrapAdmin` idempotente),
-  `internal/middleware/auth.go` (`AuthRequired` + `RBAC`), `internal/handler/auth.go` y rutas `/api/v1/auth/*`.
-  Bootstrap admin `root@gmail.com` desde env en el arranque. Tests unitarios con mocks (auth 90%, service 90%,
-  handler 90%, middleware 89%, router 96%).
-- `web/` y `frontend/` siguen vacíos.
+- **main @ 9e814e4**: los 4 PRs están mergeados (#32 generator+worker, #33 infra polish,
+  #34 web icons, #35 auth). `make build`, `go test -race ./...` y `go vet ./...` en verde.
+- **Issue #1 (infra local) completa**: `deploy/docker-compose.yml` (postgres:15-alpine + caddy:2-alpine),
+  `deploy/Caddyfile` (TLS mkcert → host-gateway:8080), `deploy/init-db.sh` idempotente, `deploy/gen-certs.sh`.
+- **Issue #6 (auth) completa**: Argon2id + JWT access/refresh HS256 (`internal/auth`), `UserRepository`
+  (`repository/auth.go`), `BootstrapAdmin` (`service/bootstrap.go`), `AuthRequired` + `RBAC`
+  (`middleware/auth.go`), endpoints `/api/v1/auth/{login,refresh,me,change-password,logout}`.
+  Bootstrap admin `root@gmail.com` desde env. Tests unitarios con mocks.
+- **Issue #7 (data generator)**: `internal/generator` (+ `generator/postgres`, store con inserts
+  batcheados), `cmd/generate` CLI, migración `source/003_generator_seeds` (tabla `generator_seeds`).
+- **Issue #8 (worker pool)**: `internal/worker` — pool con `context`, recuperación de pánicos,
+  métricas, agregación de errores y `SubmitBatch`/`SubmitStream`.
+- **PR #34**: `web/public/` con iconos (SVG + PNGs) y `manifest.webmanifest`; `web/scripts/generate-icons.sh`.
+- `frontend/` sigue vacío (no trackeado por git); no usar.
+
+## Branch local recuperado (WIP de otra sesión)
+- **`wip/jobs-scheduler-api` (local, sin push)**: ~20k líneas de trabajo no commiteado en otra sesión
+  que se perdió al hacer `git stash drop` y se recuperó del commit del stash. Contiene: `internal/jobs`
+  (manager + runners generate/migrate), `internal/scheduler` (cron persistido en lab_target), `internal/etl`
+  (source→target con checkpoint y métricas), `internal/migrate` (runner de migraciones con tracker),
+  `cmd/migrate` y `cmd/migrate-data`, endpoints source/target/analytics, CORS middleware, swagger docs
+  (`docs/swagger`), y repositorios (customer, product, order, cron_schedule, job_execution, analytics).
+  **Está basado en el main anterior (7733502)**, no en el actual (9e814e4). Requiere rebase/merge con
+  los cambios de auth y generator antes de continuar.
 
 ## Decisiones
 - Frontend va en `web/` (no en `frontend/`).
