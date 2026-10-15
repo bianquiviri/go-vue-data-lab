@@ -1,9 +1,9 @@
 //go:build tools
 
 // Package tools pins dependencies that are required by the project but are not
-// yet imported by production code (they arrive in later issues: scheduler,
-// auth/JWT and Argon2id hashing). Keeping them here ensures `go mod tidy`
-// retains them in go.mod.
+// yet imported by production code (the scheduler arrives in a later issue).
+// JWT and Argon2id are now imported directly by internal/auth, but are kept
+// here so `go mod tidy` retains them even if that code is temporarily removed.
 package tools
 
 import (

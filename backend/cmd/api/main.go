@@ -13,10 +13,13 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/josebianco/go-vue-data-lab/internal/auth"
 	"github.com/josebianco/go-vue-data-lab/internal/config"
 	"github.com/josebianco/go-vue-data-lab/internal/infrastructure/database"
 	"github.com/josebianco/go-vue-data-lab/internal/infrastructure/logger"
+	"github.com/josebianco/go-vue-data-lab/internal/repository"
 	"github.com/josebianco/go-vue-data-lab/internal/router"
+	"github.com/josebianco/go-vue-data-lab/internal/service"
 )
 
 // version is overridable at build time:
@@ -63,9 +66,30 @@ func run() error {
 	}
 	defer func() { _ = database.Close(targetDB) }()
 
+	// Authentication wiring: user repository, Argon2id hasher and JWT manager.
+	hasher := auth.Argon2Hasher{}
+	tokenManager := auth.NewJWTManager(cfg.JWTSecret, cfg.JWTAccessTTL, cfg.JWTRefreshTTL)
+	userRepo := repository.NewUserRepository(targetDB)
+	authService := service.NewAuthService(userRepo, tokenManager, hasher)
+
+	// Ensure the bootstrap admin exists (idempotent).
+	bootstrapCtx, cancelBootstrap := context.WithTimeout(context.Background(), 15*time.Second)
+	created, err := service.BootstrapAdmin(bootstrapCtx, userRepo, hasher, cfg.BootstrapAdminEmail, cfg.BootstrapAdminPassword)
+	cancelBootstrap()
+	if err != nil {
+		return fmt.Errorf("main: bootstrap admin: %w", err)
+	}
+	if created {
+		log.Info("bootstrap admin created", zap.String("email", cfg.BootstrapAdminEmail))
+	} else {
+		log.Info("bootstrap admin already present", zap.String("email", cfg.BootstrapAdminEmail))
+	}
+
 	engine := router.New(router.Dependencies{
-		Logger:  log,
-		Version: version,
+		Logger:       log,
+		Version:      version,
+		AuthService:  authService,
+		TokenManager: tokenManager,
 	})
 
 	addr := fmt.Sprintf("%s:%s", cfg.ServerHost, cfg.ServerPort)

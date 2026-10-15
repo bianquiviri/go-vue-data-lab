@@ -3,8 +3,16 @@ package config
 import (
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
+)
+
+// Default JWT lifetimes used when the corresponding environment variables are
+// absent or invalid. Access tokens are short-lived; refresh tokens last longer.
+const (
+	DefaultJWTAccessTTL  = 15 * time.Minute
+	DefaultJWTRefreshTTL = 7 * 24 * time.Hour
 )
 
 type Config struct {
@@ -20,6 +28,8 @@ type Config struct {
 	AppURL                 string
 	JWTSecret              string
 	JWTExpiryHours         int
+	JWTAccessTTL           time.Duration
+	JWTRefreshTTL          time.Duration
 	BootstrapAdminEmail    string
 	BootstrapAdminPassword string
 	LogLevel               string
@@ -54,6 +64,9 @@ func Load() (*Config, error) {
 		cfg.JWTExpiryHours = 24
 	}
 
+	cfg.JWTAccessTTL = getEnvDuration("JWT_ACCESS_TTL", DefaultJWTAccessTTL)
+	cfg.JWTRefreshTTL = getEnvDuration("JWT_REFRESH_TTL", DefaultJWTRefreshTTL)
+
 	return cfg, nil
 }
 
@@ -62,4 +75,18 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// getEnvDuration parses a duration environment variable (e.g. "15m", "168h").
+// It falls back to the provided default when the variable is unset or invalid.
+func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+	parsed, err := time.ParseDuration(value)
+	if err != nil || parsed <= 0 {
+		return defaultValue
+	}
+	return parsed
 }
