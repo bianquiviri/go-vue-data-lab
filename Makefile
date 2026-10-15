@@ -1,5 +1,11 @@
 .PHONY: build run test lint migrate-up migrate-down docker-up docker-down docker-logs docker-reset certs swagger
 
+# Docker Compose interface. Prefer the Compose v2 plugin (`docker compose`).
+# When the repo-root .env exists it is passed to Compose for variable
+# interpolation, so a single .env drives both the backend and the containers.
+# Otherwise Compose falls back to deploy/.env (git-ignored) or safe defaults.
+COMPOSE := cd deploy && docker compose $(if $(wildcard .env),--env-file ../.env,)
+
 build:
 	cd backend && go build -o ../bin/api ./cmd/api
 
@@ -28,17 +34,17 @@ docker-up:
 		echo "run 'make certs' first (requires mkcert)."; \
 		exit 1; \
 	fi
-	cd deploy && docker-compose up -d
+	$(COMPOSE) up -d
 
 docker-down:
-	cd deploy && docker-compose down
+	$(COMPOSE) down
 
 docker-logs:
-	cd deploy && docker-compose logs -f --tail=100
+	$(COMPOSE) logs -f --tail=100
 
 # Destroy containers AND named volumes (wipes the database).
 docker-reset:
-	cd deploy && docker-compose down -v
+	$(COMPOSE) down -v
 
 swagger:
 	cd backend && swag init -g cmd/api/main.go -o docs/swagger
