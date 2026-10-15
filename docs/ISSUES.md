@@ -3,11 +3,11 @@
 ## Phase 1: Infrastructure Setup (Priority: High)
 
 ### Issue #1: Docker Compose Environment
-- [ ] Create deploy/docker-compose.yml with PostgreSQL and Caddy
-- [ ] Create deploy/Caddyfile for reverse proxy
-- [ ] Create deploy/init-db.sh for database initialization
-- [ ] Configure mkcert for local TLS (godata.josebianco.local)
-- [ ] Document setup in README
+- [x] Create deploy/docker-compose.yml with PostgreSQL and Caddy
+- [x] Create deploy/Caddyfile for reverse proxy
+- [x] Create deploy/init-db.sh for database initialization
+- [x] Configure mkcert for local TLS (godata.josebianco.local)
+- [x] Document setup in README
 
 ### Issue #2: Database Migrations (Source & Target)
 - [ ] Create migrations/source/001_initial.sql (UP/DOWN)
@@ -43,13 +43,13 @@
 - [ ] User model with roles (admin/operator/viewer), password hash, status
 
 ### Issue #6: Authentication & Authorization
-- [ ] Argon2id password hashing implementation
-- [ ] Bootstrap admin (root@gmail.com) from env vars on startup
-- [ ] JWT token generation/validation (access + refresh)
-- [ ] Auth middleware for protected routes
-- [ ] RBAC middleware for role-based access control
-- [ ] Auth endpoints: POST /api/v1/auth/login, POST /api/v1/auth/refresh, GET /api/v1/auth/me
-- [ ] Password change and logout endpoints
+- [x] Argon2id password hashing implementation
+- [x] Bootstrap admin (root@gmail.com) from env vars on startup
+- [x] JWT token generation/validation (access + refresh)
+- [x] Auth middleware for protected routes
+- [x] RBAC middleware for role-based access control
+- [x] Auth endpoints: POST /api/v1/auth/login, POST /api/v1/auth/refresh, GET /api/v1/auth/me
+- [x] Password change and logout endpoints
 
 ## Phase 3: Synthetic Data Generation (Priority: High)
 

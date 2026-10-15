@@ -33,6 +33,12 @@ Docker Compose runs **PostgreSQL** and **Caddy**; the Go backend runs on the
 cp .env.example .env    # then edit values; .env is git-ignored
 ```
 
+The repo-root `.env` is loaded by **both** the Go backend (via `godotenv`) and
+Docker Compose: `make docker-up` passes it to Compose with `--env-file`. Keep
+`POSTGRES_USER`/`POSTGRES_PASSWORD` in sync with `DB_USER`/`DB_PASSWORD` so the
+database and the backend agree. Alternatively, place a `deploy/.env` file (also
+git-ignored) to configure Compose only. Never commit either file.
+
 ### 2. Generate local TLS certificates
 
 ```bash
@@ -42,6 +48,15 @@ make certs              # runs deploy/gen-certs.sh -> mkcert -install
 This installs a locally-trusted root CA and writes
 `deploy/certs/godata.josebianco.local.pem` + `...-key.pem` (git-ignored).
 `mkcert -install` may prompt for your password / Touch ID.
+
+**TLS approach:** the `Caddyfile` loads the mounted mkcert certificates
+(`tls /certs/godata.josebianco.local.pem /certs/godata.josebianco.local-key.pem`),
+so browsers show a valid padlock. The certificates must exist before
+`make docker-up` (the Makefile enforces this). If you cannot install mkcert, an
+alternative is Caddy's own local CA: replace the `tls` line with `tls internal`
+and import the generated root CA from the `caddy_data` volume (the browser will
+warn until you trust it). mkcert is preferred because its CA is trusted
+automatically on the host.
 
 ### 3. Add the local hostname
 
