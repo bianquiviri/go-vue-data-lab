@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -24,6 +25,7 @@ type Config struct {
 	BootstrapAdminPassword string
 	LogLevel               string
 	LogPath                string
+	CORSAllowedOrigins     []string
 }
 
 func Load() (*Config, error) {
@@ -54,7 +56,37 @@ func Load() (*Config, error) {
 		cfg.JWTExpiryHours = 24
 	}
 
+	cfg.CORSAllowedOrigins = parseOrigins(getEnv("CORS_ALLOWED_ORIGINS", ""), cfg.AppURL)
+
 	return cfg, nil
+}
+
+// parseOrigins resolves the allowed CORS origins: an explicit comma-separated
+// env value wins; otherwise the app URL plus the local dev-server origins are
+// allowed. Duplicates are removed while preserving order.
+func parseOrigins(raw, appURL string) []string {
+	var input string
+	if raw != "" {
+		input = raw
+	} else {
+		input = strings.Join([]string{
+			appURL,
+			"http://localhost:5173",
+			"http://127.0.0.1:5173",
+		}, ",")
+	}
+
+	seen := make(map[string]bool)
+	out := make([]string, 0, 4)
+	for _, part := range strings.Split(input, ",") {
+		origin := strings.TrimSpace(part)
+		if origin == "" || seen[origin] {
+			continue
+		}
+		seen[origin] = true
+		out = append(out, origin)
+	}
+	return out
 }
 
 func getEnv(key, defaultValue string) string {

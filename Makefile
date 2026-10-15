@@ -1,4 +1,4 @@
-.PHONY: build run test lint migrate-up migrate-down docker-up docker-down docker-logs docker-reset certs swagger
+.PHONY: build run test lint migrate-up migrate-down migrate-status docker-up docker-down docker-logs docker-reset certs swagger
 
 build:
 	cd backend && go build -o ../bin/api ./cmd/api
@@ -17,6 +17,10 @@ migrate-up:
 
 migrate-down:
 	cd backend && go run ./cmd/migrate down
+
+# Show applied/pending migrations for both databases.
+migrate-status:
+	cd backend && go run ./cmd/migrate status
 
 # Generate locally-trusted TLS certs for https://godata.josebianco.local
 certs:
