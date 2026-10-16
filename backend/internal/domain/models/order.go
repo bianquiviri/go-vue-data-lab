@@ -15,7 +15,7 @@ type Order struct {
 	Status          string          `json:"status" gorm:"size:30;not null;default:pending"`
 	TotalAmount     float64         `json:"total_amount" gorm:"type:decimal(10,2);not null"`
 	Currency        string          `json:"currency" gorm:"size:3;not null;default:USD"`
-	ShippingAddress json.RawMessage `json:"shipping_address" gorm:"type:jsonb"`
+	ShippingAddress json.RawMessage `json:"shipping_address" gorm:"type:jsonb" swaggertype:"object"`
 	OrderDate       time.Time       `json:"order_date"`
 	OrderItems      []OrderItem     `json:"order_items,omitempty" gorm:"foreignKey:OrderID"`
 }

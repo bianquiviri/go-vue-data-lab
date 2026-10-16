@@ -6,6 +6,11 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
 ## Estado actual
 - **main @ 9e814e4**: los 4 PRs están mergeados (#32 generator+worker, #33 infra polish,
   #34 web icons, #35 auth). `make build`, `go test -race ./...` y `go vet ./...` en verde.
+- **Rama `feature/jobs-scheduler-api`**: merge en curso de `wip/jobs-scheduler-api` (trabajo
+  recuperado de otra sesión, ~21k líneas) sobre el main actual. Conflictos resueltos uniendo
+  ambos lados: `cmd/api/main.go` (auth + jobs/scheduler/CORS), `config.go` (TTLs JWT + CORS),
+  `config_test.go` (split en `config_test.go` white-box + `config_cors_test.go` black-box) y
+  `docs/MEMORY.md`. `router.go` se auto-mergeó conservando auth + grupos source/target/jobs/scheduler.
 - **Issue #1 (infra local) completa**: `deploy/docker-compose.yml` (postgres:15-alpine + caddy:2-alpine),
   `deploy/Caddyfile` (TLS mkcert → host-gateway:8080), `deploy/init-db.sh` idempotente, `deploy/gen-certs.sh`.
 - **Issue #6 (auth) completa**: Argon2id + JWT access/refresh HS256 (`internal/auth`), `UserRepository`
@@ -16,36 +21,113 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
   batcheados), `cmd/generate` CLI, migración `source/003_generator_seeds` (tabla `generator_seeds`).
 - **Issue #8 (worker pool)**: `internal/worker` — pool con `context`, recuperación de pánicos,
   métricas, agregación de errores y `SubmitBatch`/`SubmitStream`.
+- **Migration runner**: `backend/internal/migrate/` + `backend/cmd/migrate/` (subcomandos
+  `up`/`down`/`status`, flag `-db source|target|all`, `-dir`, `-steps`). `make migrate-up`/
+  `migrate-down`/`migrate-status` funcionan. Verificado con Postgres 15 real.
+- **Issue #9 (ETL worker)**: `backend/internal/etl/` (+ adaptadores `internal/etl/postgres/`,
+  CLI `cmd/migrate-data/`): extract keyset, transform/validate, upsert idempotente SQL Raw,
+  checkpoint reanudable, métricas y logging zap. Verificado E2E con Postgres 15 real.
+- **Issue #10 (REST API Core) + #11 (Source Data Endpoints)**: envelope de error/paginación
+  (`internal/handler/response.go`, `pagination.go`), CORS hand-rolled (`internal/middleware/cors.go`),
+  repos GORM de `lab_source` (`internal/repository/{customer,product,order,order_item}.go` + interfaces),
+  `DataService` (`internal/service/data.go`, puerto `service.SourceData`), handlers+swagger
+  (`internal/handler/source.go`), rutas `/api/v1/source/*` y `/swagger/*any`. Verificado E2E.
+- **Issue #12 (Target Data + Analytics)**: `TargetRepositories` (alias de `SourceRepositories`),
+  `AnalyticsRepository` + `GormAnalyticsRepository` (SQL Raw: summary, top-products, top-customers),
+  `service.TargetData` (embebe `SourceData` + analytics) y `TargetDataService`, handlers
+  `internal/handler/target.go`, rutas `/api/v1/target/*` y `/api/v1/target/analytics/*`. Verificado E2E.
+- **Issue #13 (Worker & Job Control) + #14 (Scheduler/Cron)**: `internal/jobs/` (Manager con un solo
+  job activo, runners generate/migrate, `JobRepository` sobre `job_executions`), `internal/scheduler/`
+  (cron `robfig/cron/v3` persistido en `cron_schedules`, `ScheduleRepository`, `JobStarter`), puertos
+  `service.JobControl`/`service.SchedulerControl`, handlers `internal/handler/{jobs,scheduler}.go`,
+  rutas `/api/v1/jobs/*` y `/api/v1/scheduler/*`, cableado en `cmd/api/main.go`. Swagger regenerado.
 - **PR #34**: `web/public/` con iconos (SVG + PNGs) y `manifest.webmanifest`; `web/scripts/generate-icons.sh`.
 - `frontend/` sigue vacío (no trackeado por git); no usar.
-
-## Branch local recuperado (WIP de otra sesión)
-- **`wip/jobs-scheduler-api` (local, sin push)**: ~20k líneas de trabajo no commiteado en otra sesión
-  que se perdió al hacer `git stash drop` y se recuperó del commit del stash. Contiene: `internal/jobs`
-  (manager + runners generate/migrate), `internal/scheduler` (cron persistido en lab_target), `internal/etl`
-  (source→target con checkpoint y métricas), `internal/migrate` (runner de migraciones con tracker),
-  `cmd/migrate` y `cmd/migrate-data`, endpoints source/target/analytics, CORS middleware, swagger docs
-  (`docs/swagger`), y repositorios (customer, product, order, cron_schedule, job_execution, analytics).
-  **Está basado en el main anterior (7733502)**, no en el actual (9e814e4). Requiere rebase/merge con
-  los cambios de auth y generator antes de continuar.
 
 ## Decisiones
 - Frontend va en `web/` (no en `frontend/`).
 - Sin AutoMigrate: migraciones SQL versionadas.
 - TLS local: certificados **mkcert montados** en `/certs` (no `tls internal`); `make docker-up` falla si faltan.
 - Un único `.env` raíz alimenta backend (godotenv) y Compose (`--env-file ../.env` desde el Makefile).
-- Los agentes tienen `git push` denegado; publicación solo por el usuario.
+- Los agentes pueden hacer `git push`/PRs solo si el usuario lo autoriza; `gh release` denegado.
 - Auth: JWT HS256 con claim `token_type` (access/refresh) para impedir replay cruzado; TTLs por env
   `JWT_ACCESS_TTL` (15m) y `JWT_REFRESH_TTL` (168h). `JWTManager` inyecta reloj (`now`) para tests.
 - `AuthRequired`/`RBAC` son opcionales en `router.Dependencies`: si faltan, las rutas auth no se registran
   (mantiene compatibilidad con tests de router existentes).
 - Logout es stateless por ahora (sin denylist); se volverá stateful con token store/versionado.
+- Migraciones: tabla de tracking `schema_migrations (version PK, name, applied_at)` por BD.
+  Orden lexicográfico/núm. ascendente; `up` idempotente; `down` revierte las últimas N
+  (nuevas primero) en transacción por migración. `-dir` autodetecta `migrations/` subiendo
+  desde el cwd (`backend/migrations` desde la raíz).
+- ETL: upsert multi-fila `INSERT ... ON CONFLICT (id) DO UPDATE ... RETURNING (xmax = 0) AS inserted`
+  (inserted/updated derivados del booleano); conflicto siempre por PK (IDs de origen copiados
+  verbatim ⇒ idempotente). Colisiones de claves únicas secundarias (email/SKU/order_number con
+  PK distinto) abortan el lote a propósito. Cada lote en `db.Transaction`; sub-chunks de 1000
+  filas/statement. Reanudación por keyset (`WHERE id > ? ORDER BY id LIMIT ?`) + `batchTracker`
+  que solo avanza el checkpoint sobre una racha contigua de lotes OK. Checkpoint en
+  `MemoryStore` (default) o `FileStore` JSON atómico (`logs/etl-checkpoint.json` en el CLI).
+- ETL transform: normaliza (email lower, country/currency upper, status lower), recomputa
+  `orders.total_amount = round2(sum(subtotals))` y `order_items.subtotal = round2(qty*unit_price)`;
+  filas inválidas → `SkipRecord` (motivo) y se cuentan en métricas.
+- API: envelope estable `{"error":{code,message,details}}` (códigos validation_failed/bad_request/
+  not_found/internal_error) y `{"data":...,"meta":{page,per_page,total,total_pages}}` (defaults
+  page=1/per_page=20, máx 100; `page=0`/`per_page=0` equivalen a omitido). Fechas: RFC3339 o
+  `YYYY-MM-DD` (el bound de fin de rango se extiende al último instante del día).
+- API: capas handler→service→repository; puertos `service.SourceData` y `repository.*Repository`
+  permiten fakes (sin BD en tests). Repos: búsqueda `ILIKE` con wildcards escapados, orden
+  `created_at/order_date DESC, id DESC` (`order_items` por id ASC), `GetOrder` preload de items.
+- API: `router.Dependencies` extendido de forma retrocompatible con `CORS`, `Data` (nil ⇒ grupo
+  `/api/v1/source` no registrado), `Target` (nil ⇒ grupo `/api/v1/target` no registrado),
+  `Jobs`/`Scheduler` (nil ⇒ grupo no registrado) y `Middleware []gin.HandlerFunc` (hook opcional
+  aplicado a los grupos source, target, jobs y scheduler: por dónde se enchufa auth sin importar
+  `internal/auth`). En `cmd/api/main.go` se pasa `middleware.AuthRequired(tokenManager)`.
+- API target/analytics: `repository.TargetRepositories` es alias de `SourceRepositories` (mismo
+  esquema ⇒ mismos repos GORM contra `lab_target`). `service.TargetData` embebe `SourceData` y
+  añade `Summary`/`TopProducts`/`TopCustomers`; `TargetDataService` delega entidades en un
+  `SourceData` y analytics en `repository.AnalyticsRepository` (SQL Raw). Top-N: `limit` default
+  10, máx 100 (`service.NormalizeAnalyticsLimit`); respuesta `{"data":[...],"meta":{"limit":N}}`.
+  `summary` devuelve el objeto plano. `models.AnalyticsSummary.OrdersByStatus` lleva `gorm:"-"`
+  para que GORM no lo interprete como relación al escanear el SQL Raw.
+- Swagger: swag v1 (`swag init -g cmd/api/main.go -o docs/swagger` ⇒ `backend/docs/swagger`,
+  package `swagger`, importado en blanco por `cmd/api`). Genera spec **Swagger 2.0**, no OAS 3.x
+  (el CLI v2 con OAS 3.1 no es compatible con gin-swagger v1.6.1). Tag `swaggertype:"object"` en
+  `models.Order.ShippingAddress` para que swag resuelva `json.RawMessage`.
+- Jobs: `jobs.Manager` mantiene **un solo job activo** (slot reservado en `Start`; segundo intento
+  ⇒ `ErrJobRunning`). `RunnerFunc func(params any) (JobFunc, error)` construye el trabajo;
+  `JobFunc func(ctx, report func(EntityProgress)) (map[string]any, error)` (el report recibe
+  `EntityProgress`, no `Progress` completo; el Manager compone `Progress`). Estados
+  pending/running/completed/failed/stopped + `idle`; sentinelas `ErrJobRunning`, `ErrNoRunningJob`,
+  `ErrUnknownJobType`, `ErrInvalidParams`. `Stop()` cancela el ctx del job (no error si idle).
+  `History` pagina sobre `job_executions` (defaults 1/20, máx 100). Runners: `NewGenerateRunner`
+  (generator.Store) y `NewMigrateRunner` (etl.Source + etl.Loader).
+- Scheduler: `scheduler.Scheduler` envuelve `robfig/cron/v3` (5 campos, `cron.ParseStandard` para
+  validar y calcular `next_run`). `ScheduleRepository` (List/Get/Create/Update/Delete) sobre
+  `cron_schedules`; `JobStarter` = `jobManager.Start`. Operaciones List/Create/Update/Delete/
+  Enable/Disable/RunNow; `Enabled *bool` opcional en Create/Update (tri-estado). Sentinelas
+  `ErrNotFound`, `ErrInvalidCron`, `ErrInvalidParams`, `ErrUnknownCommand`; `WithValidCommands`
+  restringe `command` a generate/migrate. `Start(ctx)` carga y registra los schedules habilitados.
+- API jobs/scheduler: contrato start ⇒ `202` `{"data":{job_id,type,status}}`; stop ⇒ `200`
+  `{"data":{"stopped":true}}`; status/progress ⇒ `200` `{"data":...}`; history ⇒ envelope paginado;
+  create schedule ⇒ `201`; delete ⇒ `204` sin body; run ⇒ `200` `{"data":{"job_id":...}}`.
+  Código de error nuevo `conflict` (409) en `handler/response.go` (`RespondConflict`), además de
+  `RespondData`.
+
+## Dependencias nuevas (API)
+- `github.com/swaggo/gin-swagger`, `github.com/swaggo/files`, `github.com/swaggo/swag` v1.16.6.
+- `github.com/go-playground/validator/v10` promovida de indirecta a directa (ya estaba vía Gin).
+- `github.com/rogpeppe/go-internal v1.12.0` fijada como indirecta solo para que `go mod tidy`
+  no suba el toolchain (`go 1.24.0` intacto; swag arrastra ese test-dep transitivo).
 
 ## Pendientes / bugs
-- `002_seeders.up.sql` y `003_admin_bootstrap.up.sql` son placeholders `SELECT 1` **por diseño**
-  (seeders vía generator service; hash del admin en código).
+- `002_seeders.up.sql` (source) y `003_admin_bootstrap.up.sql` (target) son placeholders (`SELECT 1`)
+  **por diseño** (seeders vía generator service; hash del admin en código).
 - `internal/repository` sin tests de integración con DB (solo `mapError`/constructor); requiere Postgres de test.
+- `docs/ISSUES.md` es un backlog estático: no se marcan checkboxes (ni siquiera tareas ya hechas);
+  el estado real vive en este MEMORY.
 - Completar Issues #2+ (migraciones de negocio, CRUD customers/products/orders, frontend).
 
 ## Siguiente paso
-- Implementar CRUD de customers/products/orders (repository/service/handler) con tests y RBAC por rol.
+- Cerrar el merge de `feature/jobs-scheduler-api` (verificar `make build` + `go test -race ./...` +
+  `go vet ./...`), commitear y actualizar este MEMORY.
+- Luego: CRUD de customers/products/orders (repository/service/handler) con tests y RBAC por rol,
+  y endpoint protegido `GET /api/v1/admin/logs/errors` (zap+lumberjack ya listos).

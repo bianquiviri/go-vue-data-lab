@@ -13,9 +13,6 @@ import (
 	"github.com/josebianco/go-vue-data-lab/internal/domain/models"
 )
 
-// ErrNotFound is returned when a requested record does not exist.
-var ErrNotFound = errors.New("repository: not found")
-
 // UserRepository is the persistence contract for application users.
 type UserRepository interface {
 	// FindByEmail returns the user with the given email (case-sensitive).
