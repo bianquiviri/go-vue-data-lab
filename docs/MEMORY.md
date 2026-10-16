@@ -6,11 +6,15 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
 ## Estado actual
 - **main @ 9e814e4**: los 4 PRs están mergeados (#32 generator+worker, #33 infra polish,
   #34 web icons, #35 auth). `make build`, `go test -race ./...` y `go vet ./...` en verde.
-- **Rama `feature/jobs-scheduler-api`**: merge en curso de `wip/jobs-scheduler-api` (trabajo
-  recuperado de otra sesión, ~21k líneas) sobre el main actual. Conflictos resueltos uniendo
-  ambos lados: `cmd/api/main.go` (auth + jobs/scheduler/CORS), `config.go` (TTLs JWT + CORS),
-  `config_test.go` (split en `config_test.go` white-box + `config_cors_test.go` black-box) y
-  `docs/MEMORY.md`. `router.go` se auto-mergeó conservando auth + grupos source/target/jobs/scheduler.
+- **Rama `feature/jobs-scheduler-api` @ c7c5e20**: merge de `wip/jobs-scheduler-api` (trabajo
+  recuperado de otra sesión, ~21k líneas) sobre el main actual **cerrado y commiteado**
+  (`320c2cd` merge + `c7c5e20` tidy). Conflictos resueltos uniendo ambos lados: `cmd/api/main.go`
+  (auth + jobs/scheduler/CORS, con `AuthRequired` enchufado vía `Dependencies.Middleware`),
+  `config.go` (TTLs JWT + CORS), `config_test.go` (split en `config_test.go` white-box +
+  `config_cors_test.go` black-box) y `docs/MEMORY.md`. `router.go` se auto-mergeó conservando auth
+  + grupos source/target/jobs/scheduler. Conflicto semántico extra: `repository.ErrNotFound`
+  duplicado en `repository.go` y `auth.go` ⇒ se conservó el de `repository.go`. Verificado:
+  `make build`, `go vet ./...`, `go test -race ./...` en verde (golangci-lint no instalado).
 - **Issue #1 (infra local) completa**: `deploy/docker-compose.yml` (postgres:15-alpine + caddy:2-alpine),
   `deploy/Caddyfile` (TLS mkcert → host-gateway:8080), `deploy/init-db.sh` idempotente, `deploy/gen-certs.sh`.
 - **Issue #6 (auth) completa**: Argon2id + JWT access/refresh HS256 (`internal/auth`), `UserRepository`
@@ -127,7 +131,6 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
 - Completar Issues #2+ (migraciones de negocio, CRUD customers/products/orders, frontend).
 
 ## Siguiente paso
-- Cerrar el merge de `feature/jobs-scheduler-api` (verificar `make build` + `go test -race ./...` +
-  `go vet ./...`), commitear y actualizar este MEMORY.
-- Luego: CRUD de customers/products/orders (repository/service/handler) con tests y RBAC por rol,
+- CRUD de customers/products/orders (repository/service/handler) con tests y RBAC por rol,
   y endpoint protegido `GET /api/v1/admin/logs/errors` (zap+lumberjack ya listos).
+- Considerar RBAC por rol en los grupos source/target/jobs/scheduler (hoy solo `AuthRequired`).
