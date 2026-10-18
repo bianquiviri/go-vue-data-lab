@@ -58,3 +58,39 @@ func (r *GormCustomerRepository) GetByID(ctx context.Context, id uuid.UUID) (*mo
 	}
 	return &row, nil
 }
+
+// Create inserts a new customer.
+func (r *GormCustomerRepository) Create(ctx context.Context, m *models.Customer) error {
+	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
+		return mapPgError(fmt.Sprintf("create customer %s", m.ID), err)
+	}
+	return nil
+}
+
+// Update replaces an existing customer. Returns ErrNotFound if no rows affected.
+// Select forces every mutable column to be written, so zero values (e.g. a nil
+// state) are persisted rather than skipped by GORM's zero-value omission.
+func (r *GormCustomerRepository) Update(ctx context.Context, m *models.Customer) error {
+	res := r.db.WithContext(ctx).Model(&models.Customer{}).Where("id = ?", m.ID).
+		Select("first_name", "last_name", "email", "country_code", "city", "state").
+		Updates(m)
+	if res.Error != nil {
+		return mapPgError(fmt.Sprintf("update customer %s", m.ID), res.Error)
+	}
+	if res.RowsAffected == 0 {
+		return wrapNotFound(fmt.Sprintf("update customer %s", m.ID), gorm.ErrRecordNotFound)
+	}
+	return nil
+}
+
+// Delete removes a customer by id. Returns ErrNotFound if no rows affected.
+func (r *GormCustomerRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	res := r.db.WithContext(ctx).Delete(&models.Customer{}, "id = ?", id)
+	if res.Error != nil {
+		return mapPgError(fmt.Sprintf("delete customer %s", id), res.Error)
+	}
+	if res.RowsAffected == 0 {
+		return wrapNotFound(fmt.Sprintf("delete customer %s", id), gorm.ErrRecordNotFound)
+	}
+	return nil
+}

@@ -58,3 +58,39 @@ func (r *GormProductRepository) GetByID(ctx context.Context, id uuid.UUID) (*mod
 	}
 	return &row, nil
 }
+
+// Create inserts a new product.
+func (r *GormProductRepository) Create(ctx context.Context, m *models.Product) error {
+	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
+		return mapPgError(fmt.Sprintf("create product %s", m.ID), err)
+	}
+	return nil
+}
+
+// Update replaces an existing product. Returns ErrNotFound if no rows affected.
+// Select forces every mutable column to be written, so zero values (e.g. stock
+// or price set to 0) are persisted rather than skipped by GORM.
+func (r *GormProductRepository) Update(ctx context.Context, m *models.Product) error {
+	res := r.db.WithContext(ctx).Model(&models.Product{}).Where("id = ?", m.ID).
+		Select("sku", "name", "category", "price", "stock", "status").
+		Updates(m)
+	if res.Error != nil {
+		return mapPgError(fmt.Sprintf("update product %s", m.ID), res.Error)
+	}
+	if res.RowsAffected == 0 {
+		return wrapNotFound(fmt.Sprintf("update product %s", m.ID), gorm.ErrRecordNotFound)
+	}
+	return nil
+}
+
+// Delete removes a product by id. Returns ErrNotFound if no rows affected.
+func (r *GormProductRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	res := r.db.WithContext(ctx).Delete(&models.Product{}, "id = ?", id)
+	if res.Error != nil {
+		return mapPgError(fmt.Sprintf("delete product %s", id), res.Error)
+	}
+	if res.RowsAffected == 0 {
+		return wrapNotFound(fmt.Sprintf("delete product %s", id), gorm.ErrRecordNotFound)
+	}
+	return nil
+}

@@ -74,8 +74,10 @@ type stubJobControl struct{}
 func (stubJobControl) Start(context.Context, string, any) (uuid.UUID, error) {
 	return uuid.New(), nil
 }
-func (stubJobControl) Stop() error                     { return nil }
-func (stubJobControl) Status() (jobs.JobStatus, error) { return jobs.JobStatus{Status: jobs.StatusIdle}, nil }
+func (stubJobControl) Stop() error { return nil }
+func (stubJobControl) Status() (jobs.JobStatus, error) {
+	return jobs.JobStatus{Status: jobs.StatusIdle}, nil
+}
 func (stubJobControl) Progress() (jobs.Progress, error) {
 	return jobs.Progress{Status: jobs.StatusIdle}, nil
 }
@@ -536,3 +538,299 @@ func TestRouterOptionalMiddlewareAppliedToJobsAndSchedulerGroups(t *testing.T) {
 		t.Errorf("middleware hook must not run on health, got %q", got)
 	}
 }
+
+func TestRouterSourceWriteRoutesRegisteredWithData(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	engine := router.New(router.Dependencies{Logger: zap.NewNop(), Data: stubSourceData{}})
+	id := mustParseUUID(t)
+	customerBody := `{"first_name":"A","last_name":"B","email":"a@b.com","country_code":"US","city":"NY"}`
+	productBody := `{"sku":"S","name":"N","category":"C","price":1,"stock":1}`
+	orderBody := `{"customer_id":"` + id + `"}`
+
+	cases := []struct {
+		name   string
+		method string
+		path   string
+		body   string
+		want   int
+	}{
+		{"create customer", http.MethodPost, "/api/v1/source/customers", customerBody, http.StatusCreated},
+		{"update customer", http.MethodPut, "/api/v1/source/customers/" + id, customerBody, http.StatusOK},
+		{"delete customer", http.MethodDelete, "/api/v1/source/customers/" + id, "", http.StatusNoContent},
+		{"create product", http.MethodPost, "/api/v1/source/products", productBody, http.StatusCreated},
+		{"update product", http.MethodPut, "/api/v1/source/products/" + id, productBody, http.StatusOK},
+		{"delete product", http.MethodDelete, "/api/v1/source/products/" + id, "", http.StatusNoContent},
+		{"create order", http.MethodPost, "/api/v1/source/orders", orderBody, http.StatusCreated},
+		{"update order", http.MethodPut, "/api/v1/source/orders/" + id, `{"status":"shipped"}`, http.StatusOK},
+		{"delete order", http.MethodDelete, "/api/v1/source/orders/" + id, "", http.StatusNoContent},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := request(t, engine, tc.method, tc.path, tc.body)
+			if rec.Code != tc.want {
+				t.Fatalf("%s %s: expected %d, got %d (body: %s)", tc.method, tc.path, tc.want, rec.Code, rec.Body.String())
+			}
+		})
+	}
+}
+
+func TestRouterSourceWriteRoutesAbsentWithoutData(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	engine := router.New(router.Dependencies{Logger: zap.NewNop()})
+
+	rec := request(t, engine, http.MethodPost, "/api/v1/source/customers", `{}`)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected source group to be unregistered (%d), got %d", http.StatusNotFound, rec.Code)
+	}
+}
+
+func TestRouterWriteMiddlewareAppliedToSourceWritesOnly(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	base := func(c *gin.Context) {
+		c.Header("X-Base-Hook", "applied")
+		c.Next()
+	}
+	write := func(c *gin.Context) {
+		c.Header("X-Write-Hook", "applied")
+		c.Next()
+	}
+
+	engine := router.New(router.Dependencies{
+		Logger:          zap.NewNop(),
+		Data:            stubSourceData{},
+		Middleware:      []gin.HandlerFunc{base},
+		WriteMiddleware: []gin.HandlerFunc{write},
+	})
+
+	readRec := request(t, engine, http.MethodGet, "/api/v1/source/customers", "")
+	if readRec.Code != http.StatusOK {
+		t.Fatalf("GET: expected %d, got %d", http.StatusOK, readRec.Code)
+	}
+	if got := readRec.Header().Get("X-Base-Hook"); got != "applied" {
+		t.Errorf("base middleware should run on reads, got %q", got)
+	}
+	if got := readRec.Header().Get("X-Write-Hook"); got != "" {
+		t.Errorf("write middleware must not run on reads, got %q", got)
+	}
+
+	writeRec := request(t, engine, http.MethodPost, "/api/v1/source/customers",
+		`{"first_name":"A","last_name":"B","email":"a@b.com","country_code":"US","city":"NY"}`)
+	if writeRec.Code != http.StatusCreated {
+		t.Fatalf("POST: expected %d, got %d (body: %s)", http.StatusCreated, writeRec.Code, writeRec.Body.String())
+	}
+	if got := writeRec.Header().Get("X-Base-Hook"); got != "applied" {
+		t.Errorf("base middleware should also run on writes, got %q", got)
+	}
+	if got := writeRec.Header().Get("X-Write-Hook"); got != "applied" {
+		t.Errorf("write middleware should run on writes, got %q", got)
+	}
+}
+
+func TestRouterWriteMiddlewareCanAbortWritesOnly(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	forbidden := func(c *gin.Context) {
+		c.AbortWithStatus(http.StatusForbidden)
+	}
+
+	engine := router.New(router.Dependencies{
+		Logger:          zap.NewNop(),
+		Data:            stubSourceData{},
+		WriteMiddleware: []gin.HandlerFunc{forbidden},
+	})
+
+	if rec := request(t, engine, http.MethodPost, "/api/v1/source/products", `{"sku":"S","name":"N","category":"C","price":1,"stock":1}`); rec.Code != http.StatusForbidden {
+		t.Errorf("expected writes guarded (%d), got %d", http.StatusForbidden, rec.Code)
+	}
+	if rec := request(t, engine, http.MethodGet, "/api/v1/source/products", ""); rec.Code != http.StatusOK {
+		t.Errorf("reads must stay open, got %d", rec.Code)
+	}
+}
+
+// stubErrorLogs is a permissive service.ErrorLogs fake.
+type stubErrorLogs struct{}
+
+func (stubErrorLogs) RecentErrors(context.Context, int, int) ([]service.LogEntry, int, error) {
+	return []service.LogEntry{}, 0, nil
+}
+
+var _ service.ErrorLogs = stubErrorLogs{}
+
+func TestRouterAdminRouteRegisteredWhenGuarded(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	engine := router.New(router.Dependencies{
+		Logger:          zap.NewNop(),
+		Admin:           stubErrorLogs{},
+		AdminMiddleware: []gin.HandlerFunc{func(c *gin.Context) { c.Next() }},
+	})
+
+	if rec := get(t, engine, "/api/v1/admin/logs/errors", nil); rec.Code != http.StatusOK {
+		t.Fatalf("expected admin route (%d), got %d (body: %s)", http.StatusOK, rec.Code, rec.Body.String())
+	}
+}
+
+func TestRouterAdminRouteAbsentWithoutGuardOrService(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	cases := []struct {
+		name string
+		deps router.Dependencies
+	}{
+		{"service without middleware", router.Dependencies{Admin: stubErrorLogs{}}},
+		{"middleware without service", router.Dependencies{
+			AdminMiddleware: []gin.HandlerFunc{func(c *gin.Context) { c.Next() }},
+		}},
+		{"neither", router.Dependencies{}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.deps.Logger = zap.NewNop()
+			engine := router.New(tc.deps)
+			if rec := get(t, engine, "/api/v1/admin/logs/errors", nil); rec.Code != http.StatusNotFound {
+				t.Fatalf("expected admin route to be unregistered (%d), got %d", http.StatusNotFound, rec.Code)
+			}
+		})
+	}
+}
+
+func TestRouterAdminMiddlewareRunsInOrder(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	authHook := func(c *gin.Context) {
+		c.Header("X-Auth-Hook", "applied")
+		c.Next()
+	}
+	rbacHook := func(c *gin.Context) {
+		c.AbortWithStatus(http.StatusForbidden)
+	}
+
+	engine := router.New(router.Dependencies{
+		Logger:          zap.NewNop(),
+		Admin:           stubErrorLogs{},
+		AdminMiddleware: []gin.HandlerFunc{authHook, rbacHook},
+	})
+
+	rec := get(t, engine, "/api/v1/admin/logs/errors", nil)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected the admin guard to reject (%d), got %d", http.StatusForbidden, rec.Code)
+	}
+	if got := rec.Header().Get("X-Auth-Hook"); got != "applied" {
+		t.Errorf("expected the auth hook to run first, got %q", got)
+	}
+	if rec := get(t, engine, "/api/v1/health", nil); rec.Code != http.StatusOK {
+		t.Errorf("health must stay open, got %d", rec.Code)
+	}
+}
+
+func TestRouterWriteMiddlewareAppliedToJobsAndSchedulerWrites(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	write := func(c *gin.Context) {
+		c.Header("X-Write-Hook", "applied")
+		c.Next()
+	}
+
+	engine := router.New(router.Dependencies{
+		Logger:          zap.NewNop(),
+		Jobs:            stubJobControl{},
+		Scheduler:       stubSchedulerControl{},
+		WriteMiddleware: []gin.HandlerFunc{write},
+	})
+
+	id := mustParseUUID(t)
+	cases := []struct {
+		name    string
+		method  string
+		path    string
+		body    string
+		guarded bool
+	}{
+		{"job start write", http.MethodPost, "/api/v1/jobs/generate/start", `{}`, true},
+		{"job stop write", http.MethodPost, "/api/v1/jobs/stop", "", true},
+		{"job status read", http.MethodGet, "/api/v1/jobs/status", "", false},
+		{"job history read", http.MethodGet, "/api/v1/jobs/history", "", false},
+		{"schedule create write", http.MethodPost, "/api/v1/scheduler/jobs", `{"name":"n","cron_expr":"0 3 * * *","command":"generate"}`, true},
+		{"schedule run write", http.MethodPost, "/api/v1/scheduler/jobs/" + id + "/run", "", true},
+		{"schedule list read", http.MethodGet, "/api/v1/scheduler/jobs", "", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := request(t, engine, tc.method, tc.path, tc.body)
+			if rec.Code >= 400 {
+				t.Fatalf("%s %s: expected success, got %d (body: %s)", tc.method, tc.path, rec.Code, rec.Body.String())
+			}
+			got := rec.Header().Get("X-Write-Hook") == "applied"
+			if got != tc.guarded {
+				t.Errorf("%s %s: write hook applied = %v, want %v", tc.method, tc.path, got, tc.guarded)
+			}
+		})
+	}
+}
+
+// TestRouterSourceRBACMap pins the approved role map end-to-end: reads are
+// open to admin/operator/viewer, while POST/PUT/DELETE need admin/operator.
+func TestRouterSourceRBACMap(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	asRole := func(r models.UserRole) gin.HandlerFunc {
+		return func(c *gin.Context) {
+			c.Set(middleware.ContextRole, string(r))
+			c.Next()
+		}
+	}
+
+	cases := []struct {
+		role       models.UserRole
+		writeClaim int
+	}{
+		{models.RoleAdmin, http.StatusCreated},
+		{models.RoleOperator, http.StatusCreated},
+		{models.RoleViewer, http.StatusForbidden},
+	}
+	for _, tc := range cases {
+		t.Run(string(tc.role), func(t *testing.T) {
+			engine := router.New(router.Dependencies{
+				Logger:          zap.NewNop(),
+				Data:            stubSourceData{},
+				Middleware:      []gin.HandlerFunc{asRole(tc.role)},
+				WriteMiddleware: []gin.HandlerFunc{middleware.RBAC(models.RoleAdmin, models.RoleOperator)},
+			})
+
+			if rec := get(t, engine, "/api/v1/source/customers", nil); rec.Code != http.StatusOK {
+				t.Errorf("read for %s: expected %d, got %d", tc.role, http.StatusOK, rec.Code)
+			}
+
+			rec := request(t, engine, http.MethodPost, "/api/v1/source/customers",
+				`{"first_name":"A","last_name":"B","email":"a@b.com","country_code":"US","city":"NY"}`)
+			if rec.Code != tc.writeClaim {
+				t.Errorf("write for %s: expected %d, got %d (body: %s)", tc.role, tc.writeClaim, rec.Code, rec.Body.String())
+			}
+		})
+	}
+}
+
+func (stubSourceData) CreateCustomer(context.Context, service.CustomerInput) (models.Customer, error) {
+	return models.Customer{}, nil
+}
+func (stubSourceData) UpdateCustomer(context.Context, uuid.UUID, service.CustomerInput) (models.Customer, error) {
+	return models.Customer{}, nil
+}
+func (stubSourceData) DeleteCustomer(context.Context, uuid.UUID) error { return nil }
+func (stubSourceData) CreateProduct(context.Context, service.ProductInput) (models.Product, error) {
+	return models.Product{}, nil
+}
+func (stubSourceData) UpdateProduct(context.Context, uuid.UUID, service.ProductInput) (models.Product, error) {
+	return models.Product{}, nil
+}
+func (stubSourceData) DeleteProduct(context.Context, uuid.UUID) error { return nil }
+func (stubSourceData) CreateOrder(context.Context, service.OrderCreateInput) (models.Order, error) {
+	return models.Order{}, nil
+}
+func (stubSourceData) UpdateOrder(context.Context, uuid.UUID, service.OrderUpdateInput) (models.Order, error) {
+	return models.Order{}, nil
+}
+func (stubSourceData) DeleteOrder(context.Context, uuid.UUID) error { return nil }

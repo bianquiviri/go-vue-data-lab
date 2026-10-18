@@ -48,11 +48,25 @@ type Dependencies struct {
 	// /api/v1/scheduler group is not registered.
 	Scheduler service.SchedulerControl
 
+	// Admin is the error-log read port. It is only wired when AdminMiddleware
+	// is also provided: the /api/v1/admin group is registered exclusively
+	// guarded, so error logs can never be exposed by default.
+	Admin service.ErrorLogs
+
 	// Middleware is an optional hook applied to the /api/v1/source,
 	// /api/v1/target, /api/v1/jobs and /api/v1/scheduler groups only. It
 	// exists so auth/RBAC can be attached later without importing the auth
 	// package here; pass nil to leave the groups open.
 	Middleware []gin.HandlerFunc
+
+	// WriteMiddleware is an optional hook applied on top of Middleware to the
+	// mutating routes (POST/PUT/DELETE) of the source, jobs and scheduler
+	// groups. It is where write-level RBAC (e.g. admin/operator) is attached.
+	WriteMiddleware []gin.HandlerFunc
+
+	// AdminMiddleware guards the /api/v1/admin group (auth + admin-only RBAC).
+	// When empty the group is not registered at all.
+	AdminMiddleware []gin.HandlerFunc
 }
 
 // New builds the Gin engine with middleware and the v1 API routes registered.
@@ -87,6 +101,7 @@ func New(deps Dependencies) *gin.Engine {
 		registerTargetRoutes(v1, deps)
 		registerJobRoutes(v1, deps)
 		registerSchedulerRoutes(v1, deps)
+		registerAdminRoutes(v1, deps)
 	}
 
 	// Swagger UI at /swagger/index.html (OpenAPI 3.x spec served from the
@@ -137,6 +152,22 @@ func registerSourceRoutes(v1 *gin.RouterGroup, deps Dependencies) {
 	source.GET("/orders", h.ListOrders)
 	source.GET("/orders/:id", h.GetOrder)
 	source.GET("/order-items", h.ListOrderItems)
+
+	// Mutating routes live in their own subgroup so an optional write-level
+	// guard (e.g. RBAC) can be attached without affecting the read routes.
+	writes := source.Group("")
+	if len(deps.WriteMiddleware) > 0 {
+		writes.Use(deps.WriteMiddleware...)
+	}
+	writes.POST("/customers", h.CreateCustomer)
+	writes.PUT("/customers/:id", h.UpdateCustomer)
+	writes.DELETE("/customers/:id", h.DeleteCustomer)
+	writes.POST("/products", h.CreateProduct)
+	writes.PUT("/products/:id", h.UpdateProduct)
+	writes.DELETE("/products/:id", h.DeleteProduct)
+	writes.POST("/orders", h.CreateOrder)
+	writes.PUT("/orders/:id", h.UpdateOrder)
+	writes.DELETE("/orders/:id", h.DeleteOrder)
 }
 
 // registerTargetRoutes mounts the lab_target read endpoints (entity reads plus
@@ -180,9 +211,14 @@ func registerJobRoutes(v1 *gin.RouterGroup, deps Dependencies) {
 	}
 
 	h := handler.NewJobsHandler(deps.Jobs)
-	jobsGroup.POST("/generate/start", h.StartGenerate)
-	jobsGroup.POST("/migrate/start", h.StartMigrate)
-	jobsGroup.POST("/stop", h.Stop)
+	control := jobsGroup.Group("")
+	if len(deps.WriteMiddleware) > 0 {
+		control.Use(deps.WriteMiddleware...)
+	}
+	control.POST("/generate/start", h.StartGenerate)
+	control.POST("/migrate/start", h.StartMigrate)
+	control.POST("/stop", h.Stop)
+
 	jobsGroup.GET("/status", h.Status)
 	jobsGroup.GET("/history", h.History)
 	jobsGroup.GET("/progress", h.Progress)
@@ -203,10 +239,30 @@ func registerSchedulerRoutes(v1 *gin.RouterGroup, deps Dependencies) {
 
 	h := handler.NewSchedulerHandler(deps.Scheduler)
 	sched.GET("/jobs", h.List)
-	sched.POST("/jobs", h.Create)
-	sched.PUT("/jobs/:id", h.Update)
-	sched.DELETE("/jobs/:id", h.Delete)
-	sched.POST("/jobs/:id/enable", h.Enable)
-	sched.POST("/jobs/:id/disable", h.Disable)
-	sched.POST("/jobs/:id/run", h.Run)
+
+	control := sched.Group("")
+	if len(deps.WriteMiddleware) > 0 {
+		control.Use(deps.WriteMiddleware...)
+	}
+	control.POST("/jobs", h.Create)
+	control.PUT("/jobs/:id", h.Update)
+	control.DELETE("/jobs/:id", h.Delete)
+	control.POST("/jobs/:id/enable", h.Enable)
+	control.POST("/jobs/:id/disable", h.Disable)
+	control.POST("/jobs/:id/run", h.Run)
+}
+
+// registerAdminRoutes mounts the admin-only operational endpoints. It is a
+// no-op unless both an admin port and an admin guard are configured, so the
+// error log endpoint can never be registered open.
+func registerAdminRoutes(v1 *gin.RouterGroup, deps Dependencies) {
+	if deps.Admin == nil || len(deps.AdminMiddleware) == 0 {
+		return
+	}
+
+	admin := v1.Group("/admin")
+	admin.Use(deps.AdminMiddleware...)
+
+	h := handler.NewAdminHandler(deps.Admin)
+	admin.GET("/logs/errors", h.Errors)
 }

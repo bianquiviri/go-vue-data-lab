@@ -317,3 +317,40 @@ func nopOrderItemRepo(t *testing.T) *fakeOrderItemRepo {
 		},
 	}
 }
+
+func (s *nopEntitySource) CreateCustomer(context.Context, service.CustomerInput) (models.Customer, error) {
+	s.t.Fatal("CreateCustomer must not be called")
+	return models.Customer{}, nil
+}
+func (s *nopEntitySource) UpdateCustomer(context.Context, uuid.UUID, service.CustomerInput) (models.Customer, error) {
+	s.t.Fatal("UpdateCustomer must not be called")
+	return models.Customer{}, nil
+}
+func (s *nopEntitySource) DeleteCustomer(context.Context, uuid.UUID) error {
+	s.t.Fatal("DeleteCustomer must not be called")
+	return nil
+}
+func (s *nopEntitySource) CreateProduct(context.Context, service.ProductInput) (models.Product, error) {
+	s.t.Fatal("CreateProduct must not be called")
+	return models.Product{}, nil
+}
+func (s *nopEntitySource) UpdateProduct(context.Context, uuid.UUID, service.ProductInput) (models.Product, error) {
+	s.t.Fatal("UpdateProduct must not be called")
+	return models.Product{}, nil
+}
+func (s *nopEntitySource) DeleteProduct(context.Context, uuid.UUID) error {
+	s.t.Fatal("DeleteProduct must not be called")
+	return nil
+}
+func (s *nopEntitySource) CreateOrder(context.Context, service.OrderCreateInput) (models.Order, error) {
+	s.t.Fatal("CreateOrder must not be called")
+	return models.Order{}, nil
+}
+func (s *nopEntitySource) UpdateOrder(context.Context, uuid.UUID, service.OrderUpdateInput) (models.Order, error) {
+	s.t.Fatal("UpdateOrder must not be called")
+	return models.Order{}, nil
+}
+func (s *nopEntitySource) DeleteOrder(context.Context, uuid.UUID) error {
+	s.t.Fatal("DeleteOrder must not be called")
+	return nil
+}

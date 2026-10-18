@@ -64,6 +64,9 @@ type CustomerRepository interface {
 	List(ctx context.Context, opts ListOptions, f CustomerFilter) ([]models.Customer, int64, error)
 	// GetByID returns the customer with the given id, or ErrNotFound.
 	GetByID(ctx context.Context, id uuid.UUID) (*models.Customer, error)
+	Create(ctx context.Context, m *models.Customer) error
+	Update(ctx context.Context, m *models.Customer) error
+	Delete(ctx context.Context, id uuid.UUID) error
 }
 
 // ProductRepository reads products from lab_source.
@@ -71,6 +74,9 @@ type ProductRepository interface {
 	List(ctx context.Context, opts ListOptions, f ProductFilter) ([]models.Product, int64, error)
 	// GetByID returns the product with the given id, or ErrNotFound.
 	GetByID(ctx context.Context, id uuid.UUID) (*models.Product, error)
+	Create(ctx context.Context, m *models.Product) error
+	Update(ctx context.Context, m *models.Product) error
+	Delete(ctx context.Context, id uuid.UUID) error
 }
 
 // OrderRepository reads orders from lab_source.
@@ -79,6 +85,9 @@ type OrderRepository interface {
 	// GetByID returns the order with the given id including its order
 	// items, or ErrNotFound.
 	GetByID(ctx context.Context, id uuid.UUID) (*models.Order, error)
+	Create(ctx context.Context, m *models.Order) error
+	Update(ctx context.Context, m *models.Order) error
+	Delete(ctx context.Context, id uuid.UUID) error
 }
 
 // OrderItemRepository reads order items from lab_source.

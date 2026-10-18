@@ -18,6 +18,7 @@ import (
 	_ "github.com/josebianco/go-vue-data-lab/docs/swagger" // generated OpenAPI docs
 	"github.com/josebianco/go-vue-data-lab/internal/auth"
 	"github.com/josebianco/go-vue-data-lab/internal/config"
+	"github.com/josebianco/go-vue-data-lab/internal/domain/models"
 	"github.com/josebianco/go-vue-data-lab/internal/etl"
 	etlpostgres "github.com/josebianco/go-vue-data-lab/internal/etl/postgres"
 	"github.com/josebianco/go-vue-data-lab/internal/generator"
@@ -132,8 +133,16 @@ func run() error {
 		),
 		Jobs:      jobManager,
 		Scheduler: sched,
+		Admin:     service.NewFileErrorLogs(cfg.LogPath),
 		// Protect the data, jobs and scheduler groups with bearer auth.
 		Middleware: []gin.HandlerFunc{middleware.AuthRequired(tokenManager)},
+		// Mutating source/jobs/scheduler routes need admin or operator.
+		WriteMiddleware: []gin.HandlerFunc{middleware.RBAC(models.RoleAdmin, models.RoleOperator)},
+		// /api/v1/admin is guarded by auth and restricted to admins.
+		AdminMiddleware: []gin.HandlerFunc{
+			middleware.AuthRequired(tokenManager),
+			middleware.RBAC(models.RoleAdmin),
+		},
 	})
 
 	addr := fmt.Sprintf("%s:%s", cfg.ServerHost, cfg.ServerPort)

@@ -30,6 +30,16 @@ type fakeSourceService struct {
 	getOrder      func(context.Context, uuid.UUID) (models.Order, error)
 	listItems     func(context.Context, service.OrderItemListParams) (service.PageResult[models.OrderItem], error)
 	getItem       func(context.Context, int64) (models.OrderItem, error)
+
+	createCustomer func(context.Context, service.CustomerInput) (models.Customer, error)
+	updateCustomer func(context.Context, uuid.UUID, service.CustomerInput) (models.Customer, error)
+	deleteCustomer func(context.Context, uuid.UUID) error
+	createProduct  func(context.Context, service.ProductInput) (models.Product, error)
+	updateProduct  func(context.Context, uuid.UUID, service.ProductInput) (models.Product, error)
+	deleteProduct  func(context.Context, uuid.UUID) error
+	createOrder    func(context.Context, service.OrderCreateInput) (models.Order, error)
+	updateOrder    func(context.Context, uuid.UUID, service.OrderUpdateInput) (models.Order, error)
+	deleteOrder    func(context.Context, uuid.UUID) error
 }
 
 func newFakeService(t *testing.T) *fakeSourceService {
@@ -70,6 +80,42 @@ func newFakeService(t *testing.T) *fakeSourceService {
 		getItem: func(context.Context, int64) (models.OrderItem, error) {
 			unexpected("GetOrderItem")
 			return models.OrderItem{}, nil
+		},
+		createCustomer: func(context.Context, service.CustomerInput) (models.Customer, error) {
+			unexpected("CreateCustomer")
+			return models.Customer{}, nil
+		},
+		updateCustomer: func(context.Context, uuid.UUID, service.CustomerInput) (models.Customer, error) {
+			unexpected("UpdateCustomer")
+			return models.Customer{}, nil
+		},
+		deleteCustomer: func(context.Context, uuid.UUID) error {
+			unexpected("DeleteCustomer")
+			return nil
+		},
+		createProduct: func(context.Context, service.ProductInput) (models.Product, error) {
+			unexpected("CreateProduct")
+			return models.Product{}, nil
+		},
+		updateProduct: func(context.Context, uuid.UUID, service.ProductInput) (models.Product, error) {
+			unexpected("UpdateProduct")
+			return models.Product{}, nil
+		},
+		deleteProduct: func(context.Context, uuid.UUID) error {
+			unexpected("DeleteProduct")
+			return nil
+		},
+		createOrder: func(context.Context, service.OrderCreateInput) (models.Order, error) {
+			unexpected("CreateOrder")
+			return models.Order{}, nil
+		},
+		updateOrder: func(context.Context, uuid.UUID, service.OrderUpdateInput) (models.Order, error) {
+			unexpected("UpdateOrder")
+			return models.Order{}, nil
+		},
+		deleteOrder: func(context.Context, uuid.UUID) error {
+			unexpected("DeleteOrder")
+			return nil
 		},
 	}
 }
@@ -616,4 +662,32 @@ func TestSourceListOrderItemsValidation(t *testing.T) {
 			t.Fatalf("expected %d, got %d", http.StatusInternalServerError, rec.Code)
 		}
 	})
+}
+
+func (f *fakeSourceService) CreateCustomer(ctx context.Context, in service.CustomerInput) (models.Customer, error) {
+	return f.createCustomer(ctx, in)
+}
+func (f *fakeSourceService) UpdateCustomer(ctx context.Context, id uuid.UUID, in service.CustomerInput) (models.Customer, error) {
+	return f.updateCustomer(ctx, id, in)
+}
+func (f *fakeSourceService) DeleteCustomer(ctx context.Context, id uuid.UUID) error {
+	return f.deleteCustomer(ctx, id)
+}
+func (f *fakeSourceService) CreateProduct(ctx context.Context, in service.ProductInput) (models.Product, error) {
+	return f.createProduct(ctx, in)
+}
+func (f *fakeSourceService) UpdateProduct(ctx context.Context, id uuid.UUID, in service.ProductInput) (models.Product, error) {
+	return f.updateProduct(ctx, id, in)
+}
+func (f *fakeSourceService) DeleteProduct(ctx context.Context, id uuid.UUID) error {
+	return f.deleteProduct(ctx, id)
+}
+func (f *fakeSourceService) CreateOrder(ctx context.Context, in service.OrderCreateInput) (models.Order, error) {
+	return f.createOrder(ctx, in)
+}
+func (f *fakeSourceService) UpdateOrder(ctx context.Context, id uuid.UUID, in service.OrderUpdateInput) (models.Order, error) {
+	return f.updateOrder(ctx, id, in)
+}
+func (f *fakeSourceService) DeleteOrder(ctx context.Context, id uuid.UUID) error {
+	return f.deleteOrder(ctx, id)
 }

@@ -17,8 +17,11 @@ import (
 // --- function-field fakes -------------------------------------------------
 
 type fakeCustomerRepo struct {
-	list func(context.Context, repository.ListOptions, repository.CustomerFilter) ([]models.Customer, int64, error)
-	get  func(context.Context, uuid.UUID) (*models.Customer, error)
+	list   func(context.Context, repository.ListOptions, repository.CustomerFilter) ([]models.Customer, int64, error)
+	get    func(context.Context, uuid.UUID) (*models.Customer, error)
+	create func(context.Context, *models.Customer) error
+	update func(context.Context, *models.Customer) error
+	delete func(context.Context, uuid.UUID) error
 }
 
 func (f *fakeCustomerRepo) List(ctx context.Context, o repository.ListOptions, flt repository.CustomerFilter) ([]models.Customer, int64, error) {
@@ -27,10 +30,31 @@ func (f *fakeCustomerRepo) List(ctx context.Context, o repository.ListOptions, f
 func (f *fakeCustomerRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.Customer, error) {
 	return f.get(ctx, id)
 }
+func (f *fakeCustomerRepo) Create(ctx context.Context, m *models.Customer) error {
+	if f.create != nil {
+		return f.create(ctx, m)
+	}
+	return nil
+}
+func (f *fakeCustomerRepo) Update(ctx context.Context, m *models.Customer) error {
+	if f.update != nil {
+		return f.update(ctx, m)
+	}
+	return nil
+}
+func (f *fakeCustomerRepo) Delete(ctx context.Context, id uuid.UUID) error {
+	if f.delete != nil {
+		return f.delete(ctx, id)
+	}
+	return nil
+}
 
 type fakeProductRepo struct {
-	list func(context.Context, repository.ListOptions, repository.ProductFilter) ([]models.Product, int64, error)
-	get  func(context.Context, uuid.UUID) (*models.Product, error)
+	list   func(context.Context, repository.ListOptions, repository.ProductFilter) ([]models.Product, int64, error)
+	get    func(context.Context, uuid.UUID) (*models.Product, error)
+	create func(context.Context, *models.Product) error
+	update func(context.Context, *models.Product) error
+	delete func(context.Context, uuid.UUID) error
 }
 
 func (f *fakeProductRepo) List(ctx context.Context, o repository.ListOptions, flt repository.ProductFilter) ([]models.Product, int64, error) {
@@ -39,10 +63,31 @@ func (f *fakeProductRepo) List(ctx context.Context, o repository.ListOptions, fl
 func (f *fakeProductRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.Product, error) {
 	return f.get(ctx, id)
 }
+func (f *fakeProductRepo) Create(ctx context.Context, m *models.Product) error {
+	if f.create != nil {
+		return f.create(ctx, m)
+	}
+	return nil
+}
+func (f *fakeProductRepo) Update(ctx context.Context, m *models.Product) error {
+	if f.update != nil {
+		return f.update(ctx, m)
+	}
+	return nil
+}
+func (f *fakeProductRepo) Delete(ctx context.Context, id uuid.UUID) error {
+	if f.delete != nil {
+		return f.delete(ctx, id)
+	}
+	return nil
+}
 
 type fakeOrderRepo struct {
-	list func(context.Context, repository.ListOptions, repository.OrderFilter) ([]models.Order, int64, error)
-	get  func(context.Context, uuid.UUID) (*models.Order, error)
+	list   func(context.Context, repository.ListOptions, repository.OrderFilter) ([]models.Order, int64, error)
+	get    func(context.Context, uuid.UUID) (*models.Order, error)
+	create func(context.Context, *models.Order) error
+	update func(context.Context, *models.Order) error
+	delete func(context.Context, uuid.UUID) error
 }
 
 func (f *fakeOrderRepo) List(ctx context.Context, o repository.ListOptions, flt repository.OrderFilter) ([]models.Order, int64, error) {
@@ -50,6 +95,24 @@ func (f *fakeOrderRepo) List(ctx context.Context, o repository.ListOptions, flt 
 }
 func (f *fakeOrderRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.Order, error) {
 	return f.get(ctx, id)
+}
+func (f *fakeOrderRepo) Create(ctx context.Context, m *models.Order) error {
+	if f.create != nil {
+		return f.create(ctx, m)
+	}
+	return nil
+}
+func (f *fakeOrderRepo) Update(ctx context.Context, m *models.Order) error {
+	if f.update != nil {
+		return f.update(ctx, m)
+	}
+	return nil
+}
+func (f *fakeOrderRepo) Delete(ctx context.Context, id uuid.UUID) error {
+	if f.delete != nil {
+		return f.delete(ctx, id)
+	}
+	return nil
 }
 
 type fakeOrderItemRepo struct {

@@ -80,16 +80,25 @@ type OrderItemListParams struct {
 	ProductID *uuid.UUID
 }
 
-// SourceData is the read port over lab_source consumed by the HTTP layer.
+// SourceData is the read/write port over lab_source consumed by the HTTP layer.
 type SourceData interface {
 	ListCustomers(ctx context.Context, p CustomerListParams) (PageResult[models.Customer], error)
 	GetCustomer(ctx context.Context, id uuid.UUID) (models.Customer, error)
+	CreateCustomer(ctx context.Context, in CustomerInput) (models.Customer, error)
+	UpdateCustomer(ctx context.Context, id uuid.UUID, in CustomerInput) (models.Customer, error)
+	DeleteCustomer(ctx context.Context, id uuid.UUID) error
 
 	ListProducts(ctx context.Context, p ProductListParams) (PageResult[models.Product], error)
 	GetProduct(ctx context.Context, id uuid.UUID) (models.Product, error)
+	CreateProduct(ctx context.Context, in ProductInput) (models.Product, error)
+	UpdateProduct(ctx context.Context, id uuid.UUID, in ProductInput) (models.Product, error)
+	DeleteProduct(ctx context.Context, id uuid.UUID) error
 
 	ListOrders(ctx context.Context, p OrderListParams) (PageResult[models.Order], error)
 	GetOrder(ctx context.Context, id uuid.UUID) (models.Order, error)
+	CreateOrder(ctx context.Context, in OrderCreateInput) (models.Order, error)
+	UpdateOrder(ctx context.Context, id uuid.UUID, in OrderUpdateInput) (models.Order, error)
+	DeleteOrder(ctx context.Context, id uuid.UUID) error
 
 	ListOrderItems(ctx context.Context, p OrderItemListParams) (PageResult[models.OrderItem], error)
 	GetOrderItem(ctx context.Context, id int64) (models.OrderItem, error)

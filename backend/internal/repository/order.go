@@ -67,3 +67,48 @@ func (r *GormOrderRepository) GetByID(ctx context.Context, id uuid.UUID) (*model
 	}
 	return &row, nil
 }
+
+// Create inserts a new order and its order items in a transaction.
+func (r *GormOrderRepository) Create(ctx context.Context, m *models.Order) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(m).Error; err != nil {
+			return mapPgError(fmt.Sprintf("create order %s", m.ID), err)
+		}
+		if len(m.OrderItems) > 0 {
+			if err := tx.Create(&m.OrderItems).Error; err != nil {
+				return mapPgError(fmt.Sprintf("create order items for %s", m.ID), err)
+			}
+		}
+		return nil
+	})
+}
+
+// Update updates an existing order. Returns ErrNotFound if no rows affected.
+// Note: order items are not modified by this method per the contract.
+func (r *GormOrderRepository) Update(ctx context.Context, m *models.Order) error {
+	res := r.db.WithContext(ctx).Model(&models.Order{}).Where("id = ?", m.ID).Updates(m)
+	if res.Error != nil {
+		return mapPgError(fmt.Sprintf("update order %s", m.ID), res.Error)
+	}
+	if res.RowsAffected == 0 {
+		return wrapNotFound(fmt.Sprintf("update order %s", m.ID), gorm.ErrRecordNotFound)
+	}
+	return nil
+}
+
+// Delete removes an order and its order items in a transaction.
+func (r *GormOrderRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("order_id = ?", id).Delete(&models.OrderItem{}).Error; err != nil {
+			return mapPgError(fmt.Sprintf("delete order items for %s", id), err)
+		}
+		res := tx.Delete(&models.Order{}, "id = ?", id)
+		if res.Error != nil {
+			return mapPgError(fmt.Sprintf("delete order %s", id), res.Error)
+		}
+		if res.RowsAffected == 0 {
+			return wrapNotFound(fmt.Sprintf("delete order %s", id), gorm.ErrRecordNotFound)
+		}
+		return nil
+	})
+}
