@@ -6,6 +6,8 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
 ## Estado actual
 - **main @ 9e814e4**: los 4 PRs están mergeados (#32 generator+worker, #33 infra polish,
   #34 web icons, #35 auth). `make build`, `go test -race ./...` y `go vet ./...` en verde.
+- **PR #36 abierto** (`feature/jobs-scheduler-api` → `main`): jobs/scheduler API + CRUD
+  lab_source + RBAC + admin logs. Push autorizado por el usuario; `gh release` sigue denegado.
 - **Rama `feature/jobs-scheduler-api` @ 2379820**: merge de `wip/jobs-scheduler-api` (trabajo
   recuperado de otra sesión, ~21k líneas) sobre el main actual **cerrado y commiteado**
   (`320c2cd` merge + `c7c5e20` tidy + `2379820` memory). Conflictos resueltos uniendo ambos lados: `cmd/api/main.go`
