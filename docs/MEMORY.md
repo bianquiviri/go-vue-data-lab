@@ -6,15 +6,34 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
 ## Estado actual
 - **main @ 9e814e4**: los 4 PRs están mergeados (#32 generator+worker, #33 infra polish,
   #34 web icons, #35 auth). `make build`, `go test -race ./...` y `go vet ./...` en verde.
-- **Rama `feature/jobs-scheduler-api` @ c7c5e20**: merge de `wip/jobs-scheduler-api` (trabajo
+- **Rama `feature/jobs-scheduler-api` @ 2379820**: merge de `wip/jobs-scheduler-api` (trabajo
   recuperado de otra sesión, ~21k líneas) sobre el main actual **cerrado y commiteado**
-  (`320c2cd` merge + `c7c5e20` tidy). Conflictos resueltos uniendo ambos lados: `cmd/api/main.go`
+  (`320c2cd` merge + `c7c5e20` tidy + `2379820` memory). Conflictos resueltos uniendo ambos lados: `cmd/api/main.go`
   (auth + jobs/scheduler/CORS, con `AuthRequired` enchufado vía `Dependencies.Middleware`),
   `config.go` (TTLs JWT + CORS), `config_test.go` (split en `config_test.go` white-box +
   `config_cors_test.go` black-box) y `docs/MEMORY.md`. `router.go` se auto-mergeó conservando auth
   + grupos source/target/jobs/scheduler. Conflicto semántico extra: `repository.ErrNotFound`
   duplicado en `repository.go` y `auth.go` ⇒ se conservó el de `repository.go`. Verificado:
   `make build`, `go vet ./...`, `go test -race ./...` en verde (golangci-lint no instalado).
+- **CRUD lab_source + RBAC + admin logs @ d8816e8 (commiteado)**: escrituras
+  customers/products/orders en `repository/{customer,product,order}.go` (Order en transacción con
+  items; customer/product `Update` con `Select(...)` para persistir valores cero), sentinelas y
+  `mapPgError` en `repository/errors.go` (23505→`ErrConflict`, 23503→`ErrInvalidReference`),
+  DTOs+métodos write en `service/data_write.go` (normaliza email/country/status/currency, recomputa
+  subtotales/total, `wrapWriteErr` mapea a `service.Err{NotFound,Conflict,InvalidReference}`),
+  handlers en `handler/source_write.go` (POST 201 / PUT 200 / DELETE 204; 400/404/409/500).
+  RBAC: `Dependencies.WriteMiddleware` (aplica a rutas mutantes de source/jobs/scheduler) y
+  `Dependencies.AdminMiddleware` + `Dependencies.Admin` (grupo `/api/v1/admin`, solo se registra si
+  **ambos** están seteados). Endpoint `GET /api/v1/admin/logs/errors`:
+  `service.ErrorLogs`/`FileErrorLogs` (`service/errorlog.go`, lee la cola ≤4 MiB del log JSON,
+  filtra ERROR/FATAL/PANIC/DPANIC, newest-first, paginado) + `handler/admin.go`. En `main.go`:
+  `WriteMiddleware=[RBAC(admin,operator)]`, `AdminMiddleware=[AuthRequired,RBAC(admin)]`,
+  `Admin=NewFileErrorLogs(cfg.LogPath)`. Tests nuevos: `data_write_test.go`, `errorlog_test.go`,
+  `source_write_test.go`, `admin_test.go`, `errors_unit_test.go` y casos en `router_test.go`
+  (writes, WriteMiddleware por grupo, admin guard, mapa RBAC). Cobertura: handler 87%, service 84%,
+  router 99%. `go build`/`go vet`/`go test -race ./...` en verde. Swagger regenerado
+  (`swag` instalado vía `go install github.com/swaggo/swag/cmd/swag@v1.16.6`; tag
+  `swaggertype:"object"` añadido a los `ShippingAddress json.RawMessage` de los DTOs de orden).
 - **Issue #1 (infra local) completa**: `deploy/docker-compose.yml` (postgres:15-alpine + caddy:2-alpine),
   `deploy/Caddyfile` (TLS mkcert → host-gateway:8080), `deploy/init-db.sh` idempotente, `deploy/gen-certs.sh`.
 - **Issue #6 (auth) completa**: Argon2id + JWT access/refresh HS256 (`internal/auth`), `UserRepository`
@@ -115,22 +134,43 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
   create schedule ⇒ `201`; delete ⇒ `204` sin body; run ⇒ `200` `{"data":{"job_id":...}}`.
   Código de error nuevo `conflict` (409) en `handler/response.go` (`RespondConflict`), además de
   `RespondData`.
+- CRUD: solo sobre `lab_source` (`lab_target` queda solo lectura). Contrato: POST ⇒ `201`
+  `{"data":<row>}`, PUT ⇒ `200` `{"data":<row>}`, DELETE ⇒ `204` sin body; errores
+  not_found 404 / conflict 409 / invalid_reference 400 / internal 500. `Update` de customer/product
+  usa `Select(...)` (persiste ceros/nil); el de order usa `Updates(struct)` (omite ceros ⇒ solo
+  escribe los campos provistos por el DTO con punteros). Normalización: email lower, country/currency
+  upper, status lower; `order_number` autogenerado `ORD-<unixnano>` si falta; `total_amount` y
+  `subtotal` recomputados con `round2`. `UpdateOrder` sin cambios no llama al repo (evita falso 404)
+  y devuelve la orden completa con items vía `GetByID`.
+- RBAC (mapa aprobado): lecturas (GET source/target/jobs status/scheduler list) = cualquier rol
+  (`AuthRequired`); escrituras (POST/PUT/DELETE de source, jobs control y scheduler) =
+  `RBAC(admin,operator)` vía `Dependencies.WriteMiddleware`; `/api/v1/admin/*` =
+  `RBAC(admin)` vía `Dependencies.AdminMiddleware` (+ `AuthRequired`). El grupo admin solo se
+  registra si `Admin != nil && len(AdminMiddleware) > 0` (nunca abierto por defecto). Roles:
+  `models.UserRole` admin/operator/viewer.
+- Admin logs: `service.FileErrorLogs` lee **solo la cola ≤4 MiB** del log JSON rotado (evita escanear
+  100 MB), parsea una línea zap por registro (`level`,`ts`,`msg`,`caller` + extras en `fields`),
+  conserva niveles de error (ERROR/FATAL/PANIC/DPANIC, descarta registros sin `msg`), los devuelve
+  **newest-first** y pagina. Archivo inexistente ⇒ vacío sin error. `ts` acepta ISO8601 de zap,
+  RFC3339 y número unix.
 
 ## Dependencias nuevas (API)
 - `github.com/swaggo/gin-swagger`, `github.com/swaggo/files`, `github.com/swaggo/swag` v1.16.6.
 - `github.com/go-playground/validator/v10` promovida de indirecta a directa (ya estaba vía Gin).
+- `github.com/jackc/pgx/v5` promovida de indirecta a directa (para `pgconn`/códigos de error en
+  `repository/errors.go`).
 - `github.com/rogpeppe/go-internal v1.12.0` fijada como indirecta solo para que `go mod tidy`
   no suba el toolchain (`go 1.24.0` intacto; swag arrastra ese test-dep transitivo).
 
 ## Pendientes / bugs
 - `002_seeders.up.sql` (source) y `003_admin_bootstrap.up.sql` (target) son placeholders (`SELECT 1`)
   **por diseño** (seeders vía generator service; hash del admin en código).
-- `internal/repository` sin tests de integración con DB (solo `mapError`/constructor); requiere Postgres de test.
+- `internal/repository` sin tests de integración con DB (los repos GORM requieren Postgres de test;
+  ya hay unit tests de `mapPgError` en `errors_unit_test.go`).
 - `docs/ISSUES.md` es un backlog estático: no se marcan checkboxes (ni siquiera tareas ya hechas);
   el estado real vive en este MEMORY.
-- Completar Issues #2+ (migraciones de negocio, CRUD customers/products/orders, frontend).
+- Completar Issues #2+ (migraciones de negocio, frontend).
 
 ## Siguiente paso
-- CRUD de customers/products/orders (repository/service/handler) con tests y RBAC por rol,
-  y endpoint protegido `GET /api/v1/admin/logs/errors` (zap+lumberjack ya listos).
-- Considerar RBAC por rol en los grupos source/target/jobs/scheduler (hoy solo `AuthRequired`).
+- Frontend en `web/`: CRUD de customers/products/orders, tablas, temas y monitoreo de jobs.
+- Considerar rate limiting / auditoría de escrituras y logout stateful (denylist de tokens).
