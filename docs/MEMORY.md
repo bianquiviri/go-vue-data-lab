@@ -33,11 +33,23 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
   cifrados AES-256-GCM determinista (nonce = HMAC-SHA256 con subclave derivada del master key),
   formato `v1.<base64url(nonce||ct||tag)>`, `SealUUID/OpenUUID/SealInt64/OpenInt64`, sentinelas
   `ErrInvalidKey/ErrInvalidToken`. Config `SecureIDKey` desde env `SECURE_ID_KEY` (base64 o hex,
-  32 bytes exactos; falta ⇒ arranque falla). **T2 pendiente**: cablear en handlers —enmascarar
-  `:id` en paths de source/target/scheduler y todos los IDs de los JSON (`customer_id`,
-  `order_items.id` int64, etc.)—, inyectar codec en `cmd/api/main.go`, regenerar swagger y
-  actualizar tests de handler. Decisión: determinismo obligatorio para que las referencias
-  cruzadas en JSON produzcan el mismo token.
+  32 bytes exactos; falta ⇒ arranque falla). Decisión: determinismo obligatorio para que las
+  referencias cruzadas en JSON produzcan el mismo token.
+- **T2 secureid — decisiones de diseño tomadas (usuario, 19-oct)**: alcance completo = URLs +
+  bodies de request + respuestas. Tres acuerdos:
+  1. **Outbound** → interceptar en `RespondJSON`/`RespondData`/`RespondPaginated` con un walk
+     recursivo del JSON que selle toda key `id`/`*_id` que parsee como UUID o int64. *No* se
+     crea capa DTO (los handlers serializan modelos GORM directos hoy).
+  2. **Inbound** → **solo token**: `parseUUIDParam` y `parseOptionalUUID` rechazan con 400
+     cualquier UUID crudo (formato interno no expuesto).
+  3. **Alcance** → paths `:id` (17 rutas), filtros query (`customer_id`/`order_id`/`product_id`),
+     bodies de escritura (`data_write.go` con `uuid.UUID`+binding ⇒ pasar a `string` + abrir) y
+     todos los IDs de responses (incl. `order_items.id` **int64**, `CronSchedule.schedule_id`
+     **nullable** y `auth` `/me`).
+  Inyección vía `router.Dependencies.Codec` + context value (los respondedores son funciones
+  libres). El `user_id` interno del JWT **no** se toca (va firmado, no es JSON de respuesta).
+  Momento óptimo: el frontend aún no consume IDs (#20-#24 son placeholders) ⇒ romper contrato
+  es gratis. Pendiente: TDD de los 5 bloques + `make swagger`.
 - **Frontend Bloque 1 completo @ 0a56550 (Issues #17-#19)**: scaffold `web/` terminado tras
   una sesión previa interrumpida — `LoginView`, `AppLayout` (sidebar RBAC por rol, header con
   email/rol, toggle tema Claro/Oscuro/Sistema), `DashboardView` (tarjetas por sección), `PlaceholderView`
