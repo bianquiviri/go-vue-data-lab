@@ -34,12 +34,12 @@ func runCORS(t *testing.T, cfg middleware.CORSConfig, method, target string, hea
 
 func TestCORSAllowedOriginSimpleRequest(t *testing.T) {
 	rec := runCORS(t, middleware.CORSConfig{}, http.MethodGet, "/api/v1/health",
-		map[string]string{"Origin": "http://localhost:5173"})
+		map[string]string{"Origin": "http://localhost:5174"})
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected %d, got %d", http.StatusOK, rec.Code)
 	}
-	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "http://localhost:5173" {
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "http://localhost:5174" {
 		t.Errorf("Allow-Origin = %q, want the request origin", got)
 	}
 	if !strings.Contains(rec.Header().Get("Access-Control-Allow-Methods"), "GET") {
@@ -59,9 +59,9 @@ func TestCORSAllowedOriginSimpleRequest(t *testing.T) {
 
 func TestCORSDefaultOriginFromDefaultList(t *testing.T) {
 	rec := runCORS(t, middleware.CORSConfig{}, http.MethodGet, "/x",
-		map[string]string{"Origin": "https://godata.josebianco.local"})
+		map[string]string{"Origin": "https://frontgodata.josebianco.local:8443"})
 
-	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "https://godata.josebianco.local" {
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "https://frontgodata.josebianco.local:8443" {
 		t.Errorf("Allow-Origin = %q, want app URL origin", got)
 	}
 }
@@ -102,7 +102,7 @@ func TestCORSWildcardOrigin(t *testing.T) {
 func TestCORSPreflightAllowedOrigin(t *testing.T) {
 	rec := runCORS(t, middleware.CORSConfig{}, http.MethodOptions, "/api/v1/source/customers",
 		map[string]string{
-			"Origin":                         "http://localhost:5173",
+			"Origin":                         "http://localhost:5174",
 			"Access-Control-Request-Method":  http.MethodGet,
 			"Access-Control-Request-Headers": "Authorization",
 		})
@@ -110,7 +110,7 @@ func TestCORSPreflightAllowedOrigin(t *testing.T) {
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("expected %d for preflight, got %d", http.StatusNoContent, rec.Code)
 	}
-	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "http://localhost:5173" {
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "http://localhost:5174" {
 		t.Errorf("Allow-Origin = %q", got)
 	}
 	if !strings.Contains(rec.Header().Get("Access-Control-Allow-Headers"), "Authorization") {
@@ -139,7 +139,7 @@ func TestCORSPreflightDisallowedOrigin(t *testing.T) {
 
 func TestCORSOptionsWithoutPreflightFlagPassesThrough(t *testing.T) {
 	rec := runCORS(t, middleware.CORSConfig{}, http.MethodOptions, "/x",
-		map[string]string{"Origin": "http://localhost:5173"})
+		map[string]string{"Origin": "http://localhost:5174"})
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected plain OPTIONS to reach handler (%d), got %d", http.StatusOK, rec.Code)

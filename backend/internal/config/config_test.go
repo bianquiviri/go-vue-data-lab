@@ -1,9 +1,17 @@
 package config
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"testing"
 	"time"
 )
+
+func validKeyB64() string {
+	key := make([]byte, 32)
+	rand.Read(key)
+	return base64.StdEncoding.EncodeToString(key)
+}
 
 func TestGetEnvDuration(t *testing.T) {
 	const key = "TEST_DURATION_VAR"
@@ -40,6 +48,7 @@ func TestGetEnvDuration(t *testing.T) {
 func TestLoadJWTTTLs(t *testing.T) {
 	t.Setenv("JWT_ACCESS_TTL", "30m")
 	t.Setenv("JWT_REFRESH_TTL", "72h")
+	t.Setenv("SECURE_ID_KEY", validKeyB64())
 
 	cfg, err := Load()
 	if err != nil {
@@ -56,6 +65,7 @@ func TestLoadJWTTTLs(t *testing.T) {
 func TestLoadJWTTTLDefaults(t *testing.T) {
 	t.Setenv("JWT_ACCESS_TTL", "")
 	t.Setenv("JWT_REFRESH_TTL", "")
+	t.Setenv("SECURE_ID_KEY", validKeyB64())
 
 	cfg, err := Load()
 	if err != nil {

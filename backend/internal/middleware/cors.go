@@ -12,9 +12,10 @@ import (
 // DefaultCORSAllowedOrigins is used when no origins are configured: the local
 // HTTPS app URL plus the Vite dev-server origins.
 var DefaultCORSAllowedOrigins = []string{
-	"https://godata.josebianco.local",
-	"http://localhost:5173",
-	"http://127.0.0.1:5173",
+	"https://frontgodata.josebianco.local:8443",
+	"https://apidatago.josebianco.local:8443",
+	"http://localhost:5174",
+	"http://127.0.0.1:5174",
 }
 
 // corsMaxAge is the default preflight cache duration (12 hours, seconds).

@@ -28,12 +28,13 @@ migrate-down:
 migrate-status:
 	cd backend && go run ./cmd/migrate status
 
-# Generate locally-trusted TLS certs for https://godata.josebianco.local
+# Generate locally-trusted TLS certs for the local lab hosts
+# (apidatago.josebianco.local + frontgodata.josebianco.local)
 certs:
 	./deploy/gen-certs.sh
 
 docker-up:
-	@if [ ! -f deploy/certs/godata.josebianco.local.pem ]; then \
+	@if [ ! -f deploy/certs/apidatago.josebianco.local.pem ] || [ ! -f deploy/certs/frontgodata.josebianco.local.pem ]; then \
 		echo "error: TLS certificates not found."; \
 		echo "run 'make certs' first (requires mkcert)."; \
 		exit 1; \

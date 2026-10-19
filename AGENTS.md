@@ -18,7 +18,10 @@ orders, order_items).
 - **API docs**: OpenAPI 3.x / Swagger UI en `/swagger/index.html`.
 - **Frontend**: Vue 3 (`<script setup>`), TypeScript, Vite, Tailwind, shadcn-vue, pinia, vue-router.
   Temas Claro/Oscuro/Sistema persistidos en el navegador.
-- **HTTPS local**: `https://godata.josebianco.local` con Caddy + mkcert.
+- **HTTPS local**: `https://apidatago.josebianco.local:8443` (API) y
+  `https://frontgodata.josebianco.local:8443` (web) con Caddy + mkcert.
+  Puertos del lab: Caddy `8443`/`8081` y Vite `5174` (el `taskflow`
+  local ocupa 80/443/5173). Backend en `:8080`.
 
 ## Estructura
 - `backend/cmd/api` — entrypoint (pendiente).

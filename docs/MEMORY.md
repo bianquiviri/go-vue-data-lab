@@ -4,10 +4,46 @@ Memoria viva del proyecto. Se carga en cada sesión de opencode.
 Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo.
 
 ## Estado actual
-- **main @ 9e814e4**: los 4 PRs están mergeados (#32 generator+worker, #33 infra polish,
-  #34 web icons, #35 auth). `make build`, `go test -race ./...` y `go vet ./...` en verde.
-- **PR #36 abierto** (`feature/jobs-scheduler-api` → `main`): jobs/scheduler API + CRUD
-  lab_source + RBAC + admin logs. Push autorizado por el usuario; `gh release` sigue denegado.
+- **PR #40 abierto** (`feature/jobs-scheduler-api` → `main`) — *un solo PR* (decisión del
+  usuario), 7 commits, 98 archivos / +15.3k líneas: **secureid T1** + **frontend Issues #17-#19**
+  + **infra hosts/puertos**. Push + `gh pr create` autorizados por el usuario; `gh release`
+  sigue denegado. Verificado antes de subir: `go vet`/`go build`/`go test -race` ✅, y en web
+  88 tests, **cobertura 98.07% stmts / 94.87% branches**, `type-check`, `lint`, `build` ✅.
+- **main**: PRs #32-#35 y **#36** mergeados (`2ae4699`). `make build`, `go test -race ./...`
+  y `go vet ./...` en verde.
+- **Hosts locales nuevos** (decisión del usuario, `/etc/hosts` ya actualizado):
+  `127.0.0.1 apidatago.josebianco.local` (API) y `127.0.0.1 frontgodata.josebianco.local` (web).
+  Reemplazan a `godata.josebianco.local`. `deploy/Caddyfile` con dos sitios (Caddy →
+  `host.docker.internal:8080` y `:5173`), certs mkcert por host en `deploy/certs/`,
+  `gen-certs.sh` regenera ambos, Makefile comprueba ambos `.pem`. CORS/APP_URL por defecto
+  apuntan a los nuevos hosts (config + middleware + tests). `vite.config.ts` con
+  `host: true` + `allowedHosts` (Vite 6+ devuelve 403 con Host desconocido) + proxy `/api`→8080.
+  README raíz y `web/README.md` reescritos con el flujo completo (hosts, certs, SECURE_ID_KEY,
+  frontend dev) y `AGENTS.md` actualizado.
+- **Proyecto levantado en local (19-oct)**: `lab_postgres` + `lab_caddy` (make docker-up),
+  migraciones aplicadas, backend `make run` en `:8080`, Vite `npm run dev` en `:5174`.
+  **Puertos del lab** (taskflow local ocupa 80/443/5173): Caddy `8443` (HTTPS) + `8081`,
+  Vite `5174` con `strictPort: true`. Caddyfile corregido: `frontgodata` proxyaba al 5173
+  (¡caía en el Vite de taskflow y devolvía 403!). URL front `https://frontgodata.josebianco.local:8443`,
+  API `https://apidatago.josebianco.local:8443`. Fix nuevo: `config.loadDotEnv()` sube desde el
+  cwd hasta encontrar el `.env` raíz (los `make` corren desde `backend/` y no lo veían ⇒
+  `SECURE_ID_KEY` fallaba). E2E verificado: login admin, `/source/customers`, `/jobs/status`,
+  `/target/analytics/summary`, CORS preflight, swagger, cert mkcert trusted. Commit `f09b4df`.
+- **secureid @ 69a591d (T1, commiteado)**: paquete `backend/internal/secureid` — IDs opacos
+  cifrados AES-256-GCM determinista (nonce = HMAC-SHA256 con subclave derivada del master key),
+  formato `v1.<base64url(nonce||ct||tag)>`, `SealUUID/OpenUUID/SealInt64/OpenInt64`, sentinelas
+  `ErrInvalidKey/ErrInvalidToken`. Config `SecureIDKey` desde env `SECURE_ID_KEY` (base64 o hex,
+  32 bytes exactos; falta ⇒ arranque falla). **T2 pendiente**: cablear en handlers —enmascarar
+  `:id` en paths de source/target/scheduler y todos los IDs de los JSON (`customer_id`,
+  `order_items.id` int64, etc.)—, inyectar codec en `cmd/api/main.go`, regenerar swagger y
+  actualizar tests de handler. Decisión: determinismo obligatorio para que las referencias
+  cruzadas en JSON produzcan el mismo token.
+- **Frontend Bloque 1 completo @ 0a56550 (Issues #17-#19)**: scaffold `web/` terminado tras
+  una sesión previa interrumpida — `LoginView`, `AppLayout` (sidebar RBAC por rol, header con
+  email/rol, toggle tema Claro/Oscuro/Sistema), `DashboardView` (tarjetas por sección), `PlaceholderView`
+  parametrizada por meta del router; script anti-flash de tema en `index.html` (clave `gdl.theme`);
+  borrado HelloWorld del template. Verificado: 84 tests, cobertura 97.75% stmts / 92.3% branches,
+  `vue-tsc`, lint y `build` en verde.
 - **Rama `feature/jobs-scheduler-api` @ 2379820**: merge de `wip/jobs-scheduler-api` (trabajo
   recuperado de otra sesión, ~21k líneas) sobre el main actual **cerrado y commiteado**
   (`320c2cd` merge + `c7c5e20` tidy + `2379820` memory). Conflictos resueltos uniendo ambos lados: `cmd/api/main.go`
@@ -71,6 +107,11 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
 
 ## Decisiones
 - Frontend va en `web/` (no en `frontend/`).
+- Hosts lab: API en `apidatago.josebianco.local`, web en `frontgodata.josebianco.local`
+  (el viejo `godata.josebianco.local` quedó obsoleto). TLS con mkcert por host vía Caddy.
+- IDs en URLs y JSON: tokens opacos AES-256-GCM **deterministas** (`internal/secureid`),
+  porque el mismo ID debe producir el mismo token en todas las referencias cruzadas
+  del JSON. Clave en env `SECURE_ID_KEY` (nunca en código).
 - Sin AutoMigrate: migraciones SQL versionadas.
 - TLS local: certificados **mkcert montados** en `/certs` (no `tls internal`); `make docker-up` falla si faltan.
 - Un único `.env` raíz alimenta backend (godotenv) y Compose (`--env-file ../.env` desde el Makefile).
@@ -171,8 +212,27 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
   ya hay unit tests de `mapPgError` en `errors_unit_test.go`).
 - `docs/ISSUES.md` es un backlog estático: no se marcan checkboxes (ni siquiera tareas ya hechas);
   el estado real vive en este MEMORY.
+- **Issue #37 (GitHub)**: pasar la UI del frontend a **inglés** — cadenas en español en
+  `config/nav.ts`, `router/index.ts`, `LoginView.vue`, `AppLayout.vue`, `PlaceholderView.vue`
+  e `index.html` (`lang="es"`), + tests que las afirman. Decisión anotada: inglés hardcodeado,
+  sin librería i18n (solo hay un idioma).
+- **Issue #38 (GitHub)**: dar **color** al tema — la paleta es gris puro (`oklch(x 0 0)`, croma 0
+  en todos los tokens, `chart-1..5` también grises ⇒ analítica ilegible). Alcance mínimo:
+  `--primary/--ring/--accent/--sidebar-primary/--chart-1..5` con matiz y contraste AA medido.
+  Extensión opcional: selector de acento (store `accent.ts` aparte, `gdl.accent`, anti-flash).
+- **Issue #39 (GitHub)**: landing page pública en `/` — crear `LandingView` + `PublicLayout`,
+  mover Dashboard a `/dashboard`. **Cuidado**: `config/nav.ts` tiene el item Dashboard con
+  `to: '/'` y el router filtra `item.to !== '/'`; hay que cambiar ambos juntos o se duplica la
+  ruta. Decisión pendiente: qué hace `/` con sesión iniciada (recomendado: redirect a
+  `/dashboard`). El copy va en inglés (encaja con #37).
 - Completar Issues #2+ (migraciones de negocio, frontend).
 
 ## Siguiente paso
-- Frontend en `web/`: CRUD de customers/products/orders, tablas, temas y monitoreo de jobs.
+- **T2 secureid**: cablear el codec en handlers (paths `:id` + IDs de responses JSON),
+  inyectar en `cmd/api/main.go`, regenerar swagger, tests actualizados.
+- Frontend: **#37** (inglés), **#38** (color) y **#39** (landing en `/`) son puramente
+  frontend y no tocan el backend. Secuenciarlos: **#39** primero (mueve el Dashboard a
+  `/dashboard` y reestructura router/nav), luego **#37** (copy en inglés de landing + resto)
+  y **#38** (color; la landing es buen banco de pruebas).
+- Luego Issues #20-#24: tablas CRUD, jobs/scheduler, admin logs, analytics.
 - Considerar rate limiting / auditoría de escrituras y logout stateful (denylist de tokens).

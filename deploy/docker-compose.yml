@@ -3,7 +3,9 @@
 # Services:
 #   - postgres : PostgreSQL 15 with two application databases (lab_source, lab_target)
 #                created by init-db.sh on first boot.
-#   - caddy    : local reverse proxy / TLS terminator for https://godata.josebianco.local
+#   - caddy    : local reverse proxy / TLS terminator for
+#                https://apidatago.josebianco.local (API) and
+#                https://frontgodata.josebianco.local (web)
 #                forwarding to the backend running on the HOST (make run -> :8080).
 #
 # The backend is intentionally NOT part of this compose file: it runs on the host.
@@ -42,8 +44,10 @@ services:
     image: caddy:2-alpine
     container_name: lab_caddy
     ports:
-      - "80:80"
-      - "443:443"
+      # taskflow's traefik already owns 80/443 on this machine, so the lab
+      # uses 8081/8443 (URLs: https://<host>:8443).
+      - "8081:80"
+      - "8443:443"
     # Lets the container reach services running on the host (Linux needs the
     # explicit host-gateway mapping; Docker Desktop on macOS already provides it).
     extra_hosts:

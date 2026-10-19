@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-# Generates locally-trusted TLS certificates for https://godata.josebianco.local
-# using mkcert, writing them into deploy/certs/ (git-ignored).
+# Generates locally-trusted TLS certificates with mkcert, writing them into
+# deploy/certs/ (git-ignored).
+#
+# Hosts (mapped to 127.0.0.1 in /etc/hosts):
+#   apidatago.josebianco.local   -> backend Go API
+#   frontgodata.josebianco.local -> Vite dev server
 #
 # Usage:
 #     ./deploy/gen-certs.sh      # or: make certs
@@ -12,7 +16,10 @@
 # store (may prompt for your password / Touch ID on macOS). It is idempotent.
 set -euo pipefail
 
-DOMAIN="godata.josebianco.local"
+DOMAINS=(
+	"apidatago.josebianco.local"
+	"frontgodata.josebianco.local"
+)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CERT_DIR="${SCRIPT_DIR}/certs"
 
@@ -26,11 +33,13 @@ mkdir -p "$CERT_DIR"
 echo "[gen-certs] installing local CA (mkcert -install)"
 mkcert -install
 
-echo "[gen-certs] generating certificate for ${DOMAIN}"
-mkcert \
-	-key-file "${CERT_DIR}/${DOMAIN}-key.pem" \
-	-cert-file "${CERT_DIR}/${DOMAIN}.pem" \
-	"${DOMAIN}" localhost 127.0.0.1 ::1
+for DOMAIN in "${DOMAINS[@]}"; do
+	echo "[gen-certs] generating certificate for ${DOMAIN}"
+	mkcert \
+		-key-file "${CERT_DIR}/${DOMAIN}-key.pem" \
+		-cert-file "${CERT_DIR}/${DOMAIN}.pem" \
+		"${DOMAIN}" "localhost" "127.0.0.1" "::1"
+done
 
 echo "[gen-certs] done. Certificates written to ${CERT_DIR}"
 ls -1 "$CERT_DIR"

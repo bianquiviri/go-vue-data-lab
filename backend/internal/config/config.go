@@ -1,7 +1,12 @@
 package config
 
 import (
+	"encoding/base64"
+	"encoding/hex"
+	"errors"
+	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +20,16 @@ const (
 	DefaultJWTAccessTTL  = 15 * time.Minute
 	DefaultJWTRefreshTTL = 7 * 24 * time.Hour
 )
+
+var (
+	// ErrInvalidSecureIDKey is returned when SECURE_ID_KEY is missing or invalid.
+	ErrInvalidSecureIDKey = errors.New("config: invalid or missing SECURE_ID_KEY (must be 32 bytes, base64 or hex)")
+)
+
+// maxDotEnvSearchDepth bounds how many parent directories loadDotEnv walks
+// before giving up (backend/ → repo root is 1 level; keep headroom for cwd
+// deeper inside the module).
+const maxDotEnvSearchDepth = 5
 
 type Config struct {
 	DBHost                 string
@@ -36,10 +51,12 @@ type Config struct {
 	LogLevel               string
 	LogPath                string
 	CORSAllowedOrigins     []string
+	SecureIDKey            []byte
 }
 
+// Load loads configuration from environment variables.
 func Load() (*Config, error) {
-	_ = godotenv.Load()
+	loadDotEnv()
 
 	cfg := &Config{
 		DBHost:                 getEnv("DB_HOST", "localhost"),
@@ -51,7 +68,7 @@ func Load() (*Config, error) {
 		ServerPort:             getEnv("SERVER_PORT", "8080"),
 		ServerHost:             getEnv("SERVER_HOST", "0.0.0.0"),
 		AppEnv:                 getEnv("APP_ENV", "development"),
-		AppURL:                 getEnv("APP_URL", "https://godata.josebianco.local"),
+		AppURL:                 getEnv("APP_URL", "https://frontgodata.josebianco.local:8443"),
 		JWTSecret:              getEnv("JWT_SECRET", "your_jwt_secret_here_change_in_production"),
 		BootstrapAdminEmail:    getEnv("BOOTSTRAP_ADMIN_EMAIL", "root@gmail.com"),
 		BootstrapAdminPassword: getEnv("BOOTSTRAP_ADMIN_PASSWORD", "change_me_123!"),
@@ -71,6 +88,12 @@ func Load() (*Config, error) {
 
 	cfg.CORSAllowedOrigins = parseOrigins(getEnv("CORS_ALLOWED_ORIGINS", ""), cfg.AppURL)
 
+	key, err := parseSecureIDKey(getEnv("SECURE_ID_KEY", ""))
+	if err != nil {
+		return nil, fmt.Errorf("load config: %w", err)
+	}
+	cfg.SecureIDKey = key
+
 	return cfg, nil
 }
 
@@ -84,8 +107,8 @@ func parseOrigins(raw, appURL string) []string {
 	} else {
 		input = strings.Join([]string{
 			appURL,
-			"http://localhost:5173",
-			"http://127.0.0.1:5173",
+			"http://localhost:5174",
+			"http://127.0.0.1:5174",
 		}, ",")
 	}
 
@@ -121,4 +144,73 @@ func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
 		return defaultValue
 	}
 	return parsed
+}
+
+// loadDotEnv loads the repository .env file, searching upward from the current
+// working directory. Binaries are usually started from backend/ (make run,
+// make migrate-*), while the single .env lives at the repository root; plain
+// godotenv.Load() only looks at the cwd and would miss it. Existing environment
+// variables always win, so this never overrides a value already exported.
+// Missing .env is not an error (env-only deployments are valid).
+func loadDotEnv() {
+	dir, err := os.Getwd()
+	if err != nil {
+		return
+	}
+	for i := 0; i <= maxDotEnvSearchDepth; i++ {
+		candidate := filepath.Join(dir, ".env")
+		if _, err := os.Stat(candidate); err == nil {
+			// Ignored on purpose: godotenv only fills unset vars and we
+			// already validated presence with Stat.
+			_ = godotenv.Load(candidate)
+			return
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return
+		}
+		dir = parent
+	}
+}
+
+// parseSecureIDKey parses SECURE_ID_KEY as base64 or hex (32 bytes).
+func parseSecureIDKey(v string) ([]byte, error) {
+	if strings.TrimSpace(v) == "" {
+		return nil, ErrInvalidSecureIDKey
+	}
+	s := strings.TrimSpace(v)
+	// Try hex first if clean hex chars
+	if isHex(s) {
+		b, err := hex.DecodeString(s)
+		if err != nil {
+			return nil, fmt.Errorf("%w", ErrInvalidSecureIDKey)
+		}
+		if len(b) != 32 {
+			return nil, ErrInvalidSecureIDKey
+		}
+		return b, nil
+	}
+	// Try base64 (standard)
+	b, err := base64.StdEncoding.DecodeString(s)
+	if err == nil {
+		if len(b) != 32 {
+			return nil, ErrInvalidSecureIDKey
+		}
+		return b, nil
+	}
+	// Try base64 raw URL if needed? standard expected; but be flexible? spec says standard
+	return nil, ErrInvalidSecureIDKey
+}
+
+func isHex(s string) bool {
+	if len(s)%2 != 0 {
+		return false
+	}
+	for _, r := range s {
+		if (r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F') {
+			continue
+		}
+		return false
+	}
+	return true
 }
