@@ -17,6 +17,15 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
   `host: true` + `allowedHosts` (Vite 6+ devuelve 403 con Host desconocido) + proxy `/api`→8080.
   README raíz y `web/README.md` reescritos con el flujo completo (hosts, certs, SECURE_ID_KEY,
   frontend dev) y `AGENTS.md` actualizado.
+- **Proyecto levantado en local (19-oct)**: `lab_postgres` + `lab_caddy` (make docker-up),
+  migraciones aplicadas, backend `make run` en `:8080`, Vite `npm run dev` en `:5174`.
+  **Puertos del lab** (taskflow local ocupa 80/443/5173): Caddy `8443` (HTTPS) + `8081`,
+  Vite `5174` con `strictPort: true`. Caddyfile corregido: `frontgodata` proxyaba al 5173
+  (¡caía en el Vite de taskflow y devolvía 403!). URL front `https://frontgodata.josebianco.local:8443`,
+  API `https://apidatago.josebianco.local:8443`. Fix nuevo: `config.loadDotEnv()` sube desde el
+  cwd hasta encontrar el `.env` raíz (los `make` corren desde `backend/` y no lo veían ⇒
+  `SECURE_ID_KEY` fallaba). E2E verificado: login admin, `/source/customers`, `/jobs/status`,
+  `/target/analytics/summary`, CORS preflight, swagger, cert mkcert trusted. Commit `f09b4df`.
 - **secureid @ 69a591d (T1, commiteado)**: paquete `backend/internal/secureid` — IDs opacos
   cifrados AES-256-GCM determinista (nonce = HMAC-SHA256 con subclave derivada del master key),
   formato `v1.<base64url(nonce||ct||tag)>`, `SealUUID/OpenUUID/SealInt64/OpenInt64`, sentinelas
