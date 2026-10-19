@@ -19,7 +19,6 @@ import {
   makeTokens,
   makeUser,
   post,
-  trackAuthHeader,
 } from '@/__tests__/fixtures'
 
 describe('api client', () => {
@@ -38,7 +37,7 @@ describe('api client', () => {
 
   it('adjunta el Authorization Bearer cuando hay access token en memoria', async () => {
     const seen = { value: null as string | null }
-    configureAuthHooks({ getAccessToken: () => 'access-xyz', refresh: vi.fn() })
+    configureAuthHooks({ getAccessToken: () => 'access-xyz', refresh: vi.fn<() => Promise<void>>() })
     server.use(get('/me', (info) => {
       seen.value = info.request.headers.get('Authorization')
       return json({ user: makeUser() })
@@ -50,7 +49,7 @@ describe('api client', () => {
 
   it('no manda Authorization cuando no hay access token', async () => {
     const seen = { value: 'sentinel' as string | null }
-    configureAuthHooks({ getAccessToken: () => null, refresh: vi.fn() })
+    configureAuthHooks({ getAccessToken: () => null, refresh: vi.fn<() => Promise<void>>() })
     server.use(get('/me', (info) => {
       seen.value = info.request.headers.get('Authorization')
       return json({ user: makeUser() })
@@ -104,7 +103,7 @@ describe('api client', () => {
   it('convierte el error plano de auth en ApiError', async () => {
     server.use(post('/auth/login', () => json(flatError('invalid email or password'), 401)))
 
-    const err = await api.post('/auth/login', {}).catch((e: ApiError) => e)
+    const err = (await api.post('/auth/login', {}).catch((e: ApiError) => e)) as ApiError
     expect(err).toBeInstanceOf(ApiError)
     expect(err.status).toBe(401)
     expect(err.message).toBe('invalid email or password')
@@ -113,7 +112,7 @@ describe('api client', () => {
   it('reporta network_error si el backend no responde', async () => {
     server.use(http.get('*/api/v1/me', () => HttpResponse.error()))
 
-    const err = await api.get('/me').catch((e: ApiError) => e)
+    const err = (await api.get('/me').catch((e: ApiError) => e)) as ApiError
     expect(err).toBeInstanceOf(ApiError)
     expect(err.code).toBe('network_error')
   })
@@ -128,10 +127,10 @@ describe('api client', () => {
         return meCalls === 1 ? json(flatError('unauthorized'), 401) : json({ user: makeUser() })
       }),
     )
-    const refresh = vi.fn(async () => {
+    const refresh = vi.fn<() => Promise<void>>(async () => {
       token = 'new-access'
     })
-    const onAuthFailure = vi.fn()
+    const onAuthFailure = vi.fn<() => void>()
     configureAuthHooks({ getAccessToken: () => token, refresh, onAuthFailure })
 
     const res = await api.get('/me')
@@ -142,8 +141,8 @@ describe('api client', () => {
 
   it('no reintenta más de una vez si el retry vuelve a devolver 401', async () => {
     server.use(get('/me', () => json(flatError('unauthorized'), 401)))
-    const refresh = vi.fn().mockResolvedValue(undefined)
-    const onAuthFailure = vi.fn()
+    const refresh = vi.fn<() => Promise<void>>().mockResolvedValue(undefined)
+    const onAuthFailure = vi.fn<() => void>()
     configureAuthHooks({ getAccessToken: () => 'access', refresh, onAuthFailure })
 
     const err = await api.get('/me').catch((e: ApiError) => e)
@@ -157,8 +156,8 @@ describe('api client', () => {
       post('/auth/refresh', () => json(flatError('invalid or expired refresh token'), 401)),
       get('/me', () => json(flatError('unauthorized'), 401)),
     )
-    const onAuthFailure = vi.fn()
-    const refresh = vi.fn().mockRejectedValue(
+    const onAuthFailure = vi.fn<() => void>()
+    const refresh = vi.fn<() => Promise<void>>().mockRejectedValue(
       new ApiError({ status: 401, code: 'unauthorized', message: 'invalid or expired refresh token' }),
     )
     configureAuthHooks({ getAccessToken: () => 'stale', refresh, onAuthFailure })
@@ -171,8 +170,8 @@ describe('api client', () => {
   })
 
   it('las requests marcadas con withoutRefresh no disparan el refresh', async () => {
-    const refresh = vi.fn()
-    configureAuthHooks({ getAccessToken: () => 'stale', refresh, onAuthFailure: vi.fn() })
+    const refresh = vi.fn<() => Promise<void>>()
+    configureAuthHooks({ getAccessToken: () => 'stale', refresh, onAuthFailure: vi.fn<() => void>() })
     server.use(post('/auth/refresh', () => json(flatError('invalid or expired refresh token'), 401)))
 
     const err = await api

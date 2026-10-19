@@ -1,54 +1,75 @@
-# webapp
+# web — Go Concurrent Data Processing Lab (frontend)
 
-This template should help get you started developing with Vue 3 in Vite.
+Frontend Vue 3 del lab. Fuente única del frontend (`frontend/` está vacío y no
+se usa).
 
-## Recommended IDE Setup
+## Stack
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+- Vue 3 (`<script setup>`) + TypeScript + Vite
+- Tailwind CSS + shadcn-vue (reka-ui) + lucide icons
+- pinia (stores) + vue-router
+- Vitest + @vue/test-utils (cobertura ≥80%)
 
-## Recommended Browser Setup
-
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
-
-## Type Support for `.vue` Imports in TS
-
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
-
-## Customize configuration
-
-See [Vite Configuration Reference](https://vite.dev/config/).
-
-## Project Setup
+## Desarrollo
 
 ```sh
 npm install
+npm run dev        # Vite en http://localhost:5173
 ```
 
-### Compile and Hot-Reload for Development
+El dev server está en **modo `host: true`** con `allowedHosts` para que
+`https://frontgodata.josebianco.local` (Caddy → `host.docker.internal:5173`)
+pueda proxyar hacia él. Si añades otro hostname lab, agrégalo a
+`allowedHosts` en `vite.config.ts`.
+
+### Proxy a la API
+
+`vite.config.ts` proxya `/api` y `/swagger` hacia el backend Go
+(`http://localhost:8080` por defecto, configurable con
+`VITE_BACKEND_TARGET`). Por eso el cliente API usa `baseURL = '/api/v1'`
+(`src/api/client.ts`) y todo es same-origin desde el navegador.
+
+También puedes apuntar directo a la API con un `.env.local`:
 
 ```sh
-npm run dev
+VITE_API_BASE_URL=https://apidatago.josebianco.local/api/v1
 ```
 
-### Type-Check, Compile and Minify for Production
+En ese caso el backend debe permitir el origen en `CORS_ALLOWED_ORIGINS`.
+
+## Comandos
 
 ```sh
-npm run build
+npm run test         # vitest run (unit + component)
+npm run test:watch   # watch
+npm run test:coverage# cobertura (≥80%)
+npm run type-check   # vue-tsc
+npm run lint         # oxlint + eslint
+npm run build        # type-check + build de producción
 ```
 
-### Run Unit Tests with [Vitest](https://vitest.dev/)
+## Estructura
 
-```sh
-npm run test:unit
+```
+src/
+  api/        cliente Axios (envelope de errores, refresh JWT, hooks)
+  components/ UI shadcn-vue y componentes propios
+  config/     navegación / menú
+  layouts/    layout autenticado (sidebar + header + tema)
+  router/     rutas + guards de sesión
+  stores/     pinia (auth, theme)
+  types/      tipos compartidos de API
+  views/      vistas por ruta
+  lib/        utilidades (cn, etc.)
 ```
 
-### Lint with [ESLint](https://eslint.org/)
+## Temas
 
-```sh
-npm run lint
-```
+Claro / Oscuro / Sistema, persistido en `localStorage` y aplicado sin flash
+inicial (script en `index.html`). Modo Sistema respeta
+`prefers-color-scheme`.
+
+## Iconos
+
+`public/` contiene los iconos del PWA (SVG + PNG + `manifest.webmanifest`).
+Regenerados con `scripts/generate-icons.sh`. Ver `README-icons.md`.

@@ -42,7 +42,7 @@ describe('api/auth', () => {
   })
 
   it('refreshRequest no entra en bucle con el interceptor ante un 401', async () => {
-    const refresh = vi.fn()
+    const refresh = vi.fn<() => Promise<void>>()
     configureAuthHooks({ getAccessToken: () => 'stale', refresh })
     server.use(post('/auth/refresh', () => json(flatError('invalid or expired refresh token'), 401)))
 
