@@ -4,10 +4,13 @@ Memoria viva del proyecto. Se carga en cada sesión de opencode.
 Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo.
 
 ## Estado actual
-- **main @ 9e814e4**: los 4 PRs están mergeados (#32 generator+worker, #33 infra polish,
-  #34 web icons, #35 auth). `make build`, `go test -race ./...` y `go vet ./...` en verde.
-- **PR #36 abierto** (`feature/jobs-scheduler-api` → `main`): jobs/scheduler API + CRUD
-  lab_source + RBAC + admin logs. Push autorizado por el usuario; `gh release` sigue denegado.
+- **PR #40 abierto** (`feature/jobs-scheduler-api` → `main`) — *un solo PR* (decisión del
+  usuario), 7 commits, 98 archivos / +15.3k líneas: **secureid T1** + **frontend Issues #17-#19**
+  + **infra hosts/puertos**. Push + `gh pr create` autorizados por el usuario; `gh release`
+  sigue denegado. Verificado antes de subir: `go vet`/`go build`/`go test -race` ✅, y en web
+  88 tests, **cobertura 98.07% stmts / 94.87% branches**, `type-check`, `lint`, `build` ✅.
+- **main**: PRs #32-#35 y **#36** mergeados (`2ae4699`). `make build`, `go test -race ./...`
+  y `go vet ./...` en verde.
 - **Hosts locales nuevos** (decisión del usuario, `/etc/hosts` ya actualizado):
   `127.0.0.1 apidatago.josebianco.local` (API) y `127.0.0.1 frontgodata.josebianco.local` (web).
   Reemplazan a `godata.josebianco.local`. `deploy/Caddyfile` con dos sitios (Caddy →
