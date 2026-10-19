@@ -51,4 +51,27 @@ describe('views/PlaceholderView', () => {
     // name 'scheduler' sí está en NAV_ITEMS ⇒ cae al icono/título del item.
     expect(wrapper.text()).toContain('Scheduler')
   })
+
+  it('usa el fallback absoluto cuando no hay meta ni entrada en NAV_ITEMS', async () => {
+    // Ruta huérfana: sin meta y con un name que no existe en NAV_ITEMS.
+    const auth = useAuthStore()
+    auth.user = makeUser()
+    auth.accessToken = 'access-token'
+    auth.initialized = true
+
+    const router = createAppRouter()
+    router.addRoute({
+      path: '/orphan-section',
+      name: 'orphan-section',
+      component: PlaceholderView,
+    })
+    await router.push('/orphan-section')
+    await router.isReady()
+
+    const wrapper = mount(PlaceholderView, { global: { plugins: [router] } })
+
+    expect(wrapper.text()).toContain('Sección')
+    // Sin descripción ⇒ el párrafo existe pero vacío.
+    expect(wrapper.find('p').exists()).toBe(true)
+  })
 })
