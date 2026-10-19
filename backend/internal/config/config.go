@@ -1,6 +1,10 @@
 package config
 
 import (
+	"encoding/base64"
+	"encoding/hex"
+	"errors"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -14,6 +18,11 @@ import (
 const (
 	DefaultJWTAccessTTL  = 15 * time.Minute
 	DefaultJWTRefreshTTL = 7 * 24 * time.Hour
+)
+
+var (
+	// ErrInvalidSecureIDKey is returned when SECURE_ID_KEY is missing or invalid.
+	ErrInvalidSecureIDKey = errors.New("config: invalid or missing SECURE_ID_KEY (must be 32 bytes, base64 or hex)")
 )
 
 type Config struct {
@@ -36,8 +45,10 @@ type Config struct {
 	LogLevel               string
 	LogPath                string
 	CORSAllowedOrigins     []string
+	SecureIDKey            []byte
 }
 
+// Load loads configuration from environment variables.
 func Load() (*Config, error) {
 	_ = godotenv.Load()
 
@@ -70,6 +81,12 @@ func Load() (*Config, error) {
 	cfg.JWTRefreshTTL = getEnvDuration("JWT_REFRESH_TTL", DefaultJWTRefreshTTL)
 
 	cfg.CORSAllowedOrigins = parseOrigins(getEnv("CORS_ALLOWED_ORIGINS", ""), cfg.AppURL)
+
+	key, err := parseSecureIDKey(getEnv("SECURE_ID_KEY", ""))
+	if err != nil {
+		return nil, fmt.Errorf("load config: %w", err)
+	}
+	cfg.SecureIDKey = key
 
 	return cfg, nil
 }
@@ -121,4 +138,46 @@ func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
 		return defaultValue
 	}
 	return parsed
+}
+
+// parseSecureIDKey parses SECURE_ID_KEY as base64 or hex (32 bytes).
+func parseSecureIDKey(v string) ([]byte, error) {
+	if strings.TrimSpace(v) == "" {
+		return nil, ErrInvalidSecureIDKey
+	}
+	s := strings.TrimSpace(v)
+	// Try hex first if clean hex chars
+	if isHex(s) {
+		b, err := hex.DecodeString(s)
+		if err != nil {
+			return nil, fmt.Errorf("%w", ErrInvalidSecureIDKey)
+		}
+		if len(b) != 32 {
+			return nil, ErrInvalidSecureIDKey
+		}
+		return b, nil
+	}
+	// Try base64 (standard)
+	b, err := base64.StdEncoding.DecodeString(s)
+	if err == nil {
+		if len(b) != 32 {
+			return nil, ErrInvalidSecureIDKey
+		}
+		return b, nil
+	}
+	// Try base64 raw URL if needed? standard expected; but be flexible? spec says standard
+	return nil, ErrInvalidSecureIDKey
+}
+
+func isHex(s string) bool {
+	if len(s)%2 != 0 {
+		return false
+	}
+	for _, r := range s {
+		if (r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F') {
+			continue
+		}
+		return false
+	}
+	return true
 }
