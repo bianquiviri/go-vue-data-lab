@@ -9,16 +9,19 @@ import (
 	"github.com/josebianco/go-vue-data-lab/internal/config"
 )
 
-func validKeyB64() string {
+func validKeyB64(t *testing.T) string {
+	t.Helper()
 	key := make([]byte, 32)
-	rand.Read(key)
+	if _, err := rand.Read(key); err != nil {
+		t.Fatalf("rand.Read: %v", err)
+	}
 	return base64.StdEncoding.EncodeToString(key)
 }
 
 func TestLoadCORSDefaultOrigins(t *testing.T) {
 	t.Setenv("CORS_ALLOWED_ORIGINS", "")
 	t.Setenv("APP_URL", "https://frontgodata.josebianco.local:8443")
-	t.Setenv("SECURE_ID_KEY", validKeyB64())
+	t.Setenv("SECURE_ID_KEY", validKeyB64(t))
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -37,7 +40,7 @@ func TestLoadCORSDefaultOrigins(t *testing.T) {
 
 func TestLoadCORSExplicitOrigins(t *testing.T) {
 	t.Setenv("CORS_ALLOWED_ORIGINS", " https://a.example ,, https://b.example ,https://a.example")
-	t.Setenv("SECURE_ID_KEY", validKeyB64())
+	t.Setenv("SECURE_ID_KEY", validKeyB64(t))
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -53,7 +56,7 @@ func TestLoadCORSExplicitOrigins(t *testing.T) {
 func TestLoadCORSDefaultsFollowAppURL(t *testing.T) {
 	t.Setenv("CORS_ALLOWED_ORIGINS", "")
 	t.Setenv("APP_URL", "https://custom.local")
-	t.Setenv("SECURE_ID_KEY", validKeyB64())
+	t.Setenv("SECURE_ID_KEY", validKeyB64(t))
 
 	cfg, err := config.Load()
 	if err != nil {

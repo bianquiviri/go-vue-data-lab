@@ -65,12 +65,12 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
   `/auth/me` y `/auth/refresh` con id sellado, swagger 200, todo vía Caddy 200.
   Cobertura: `handler` 87.3%→**88.7%**, `router` 99.1%, `secureid` 91.0%. `make build`/`go vet`/
   `go test -race` (21 paquetes ok) limpios.
-- ⚠️ **`make lint` SIGUE EN ROJO — 8 hallazgos PREEXISTENTES (0 del T2, verificado cruzando los
-  archivos del commit)**: `config/config_test.go`, `config/config_cors_test.go`,
-  `secureid/secureid.go:115` (SA9003 rama vacía, de T1), `secureid/secureid_test.go` ×2,
-  `migrate/migrate.go:46` (`fileRef` sin usar), `worker/worker_test.go` ×3 (`p.Submit` sin
-  comprobar). **Pendiente decidir un bloque de saneamiento de lint** (no hecho para no ampliar
-  el scope del T2).
+- ✅ **`make lint` VERDE (19-oct)**: saneados los 8 hallazgos preexistentes — `rand.Read` sin
+  comprobar en `config_test.go`/`config_cors_test.go`/`secureid_test.go` (helpers ahora reciben
+  `t` y usan `t.Fatalf`), rama vacía `SA9003` en `secureid/secureid.go` (**código muerto
+  redundante**: la validación real de longitud ya existe al final de `open()`, no era agujero de
+  seguridad), tipo `fileRef` sin usar en `migrate.go` y `p.Submit` sin comprobar en
+  `worker_test.go` ×3. Verificado: `make lint` exit 0, `go test -race` 21 paquetes ok, `gofmt` limpio.
 - **Frontend Bloque 1 completo @ 0a56550 (Issues #17-#19)**: scaffold `web/` terminado tras
   una sesión previa interrumpida — `LoginView`, `AppLayout` (sidebar RBAC por rol, header con
   email/rol, toggle tema Claro/Oscuro/Sistema), `DashboardView` (tarjetas por sección), `PlaceholderView`
@@ -274,7 +274,9 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
   opacos y hay que **pasarlos tal cual** de vuelta en paths/filtros/bodies (no reinterpretarlos).
 - **Pendiente autorización del usuario**: subir los 3 commits nuevos (decisiones T2, #39, T2) —
   decidir si van al **PR #40** o se parte en un **PR apilado**.
-- **Decidir bloque de saneamiento de `make lint`** (8 hallazgos preexistentes).
+- **Decidir con el usuario**: la landing (`/`) redirige a `/dashboard` si hay sesión, así que un
+  usuario logueado **nunca la ve** (le pasó al usuario al revisarla). Opciones: mantener el redirect
+  (solo visitantes) o mostrar la landing siempre y cambiar el CTA a "Go to dashboard" con sesión.
 - Frontend: **#37** (inglés) → **#38** (color). El #39 ya está hecho; la landing es buen banco
   de pruebas del #38.
 - **Rama**: todo el trabajo sigue en `feature/jobs-scheduler-api` (misma rama del PR #40,
