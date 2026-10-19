@@ -12,13 +12,24 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 
+	"github.com/gin-gonic/gin"
+	_ "github.com/josebianco/go-vue-data-lab/docs/swagger" // generated OpenAPI docs
 	"github.com/josebianco/go-vue-data-lab/internal/auth"
 	"github.com/josebianco/go-vue-data-lab/internal/config"
+	"github.com/josebianco/go-vue-data-lab/internal/domain/models"
+	"github.com/josebianco/go-vue-data-lab/internal/etl"
+	etlpostgres "github.com/josebianco/go-vue-data-lab/internal/etl/postgres"
+	"github.com/josebianco/go-vue-data-lab/internal/generator"
+	generatorpostgres "github.com/josebianco/go-vue-data-lab/internal/generator/postgres"
 	"github.com/josebianco/go-vue-data-lab/internal/infrastructure/database"
 	"github.com/josebianco/go-vue-data-lab/internal/infrastructure/logger"
+	"github.com/josebianco/go-vue-data-lab/internal/jobs"
+	"github.com/josebianco/go-vue-data-lab/internal/middleware"
 	"github.com/josebianco/go-vue-data-lab/internal/repository"
 	"github.com/josebianco/go-vue-data-lab/internal/router"
+	"github.com/josebianco/go-vue-data-lab/internal/scheduler"
 	"github.com/josebianco/go-vue-data-lab/internal/service"
 )
 
@@ -30,6 +41,11 @@ var version = "dev"
 // shutdownTimeout bounds the graceful shutdown window.
 const shutdownTimeout = 15 * time.Second
 
+// @title			Go Concurrent Data Processing Lab API
+// @version		1.0
+// @description	REST API for the Go Concurrent Data Processing Lab, a concurrent data processing and synthetic e-commerce analytics platform.
+// @BasePath		/api/v1
+// @schemes		http https
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "fatal: %v\n", err)
@@ -60,11 +76,15 @@ func run() error {
 	}
 	defer func() { _ = database.Close(sourceDB) }()
 
+	sourceRepos := repository.NewSourceRepositories(sourceDB)
+
 	targetDB, err := database.OpenTarget(cfg)
 	if err != nil {
 		return fmt.Errorf("main: open target database: %w", err)
 	}
 	defer func() { _ = database.Close(targetDB) }()
+
+	targetRepos := repository.NewTargetRepositories(targetDB)
 
 	// Authentication wiring: user repository, Argon2id hasher and JWT manager.
 	hasher := auth.Argon2Hasher{}
@@ -85,11 +105,44 @@ func run() error {
 		log.Info("bootstrap admin already present", zap.String("email", cfg.BootstrapAdminEmail))
 	}
 
+	jobManager, err := buildJobManager(log, sourceDB, targetDB)
+	if err != nil {
+		return fmt.Errorf("main: build job manager: %w", err)
+	}
+	defer func() { _ = jobManager.Stop() }()
+
+	sched, err := buildScheduler(log, targetDB, jobManager.Start)
+	if err != nil {
+		return fmt.Errorf("main: build scheduler: %w", err)
+	}
+	if err := sched.Start(context.Background()); err != nil {
+		return fmt.Errorf("main: start scheduler: %w", err)
+	}
+	defer sched.Stop()
+
 	engine := router.New(router.Dependencies{
 		Logger:       log,
 		Version:      version,
 		AuthService:  authService,
 		TokenManager: tokenManager,
+		CORS:         middleware.CORSConfig{AllowedOrigins: cfg.CORSAllowedOrigins},
+		Data:         service.NewDataService(sourceRepos.Customers, sourceRepos.Products, sourceRepos.Orders, sourceRepos.OrderItems),
+		Target: service.NewTargetDataService(
+			service.NewDataService(targetRepos.Customers, targetRepos.Products, targetRepos.Orders, targetRepos.OrderItems),
+			repository.NewAnalyticsRepository(targetDB),
+		),
+		Jobs:      jobManager,
+		Scheduler: sched,
+		Admin:     service.NewFileErrorLogs(cfg.LogPath),
+		// Protect the data, jobs and scheduler groups with bearer auth.
+		Middleware: []gin.HandlerFunc{middleware.AuthRequired(tokenManager)},
+		// Mutating source/jobs/scheduler routes need admin or operator.
+		WriteMiddleware: []gin.HandlerFunc{middleware.RBAC(models.RoleAdmin, models.RoleOperator)},
+		// /api/v1/admin is guarded by auth and restricted to admins.
+		AdminMiddleware: []gin.HandlerFunc{
+			middleware.AuthRequired(tokenManager),
+			middleware.RBAC(models.RoleAdmin),
+		},
 	})
 
 	addr := fmt.Sprintf("%s:%s", cfg.ServerHost, cfg.ServerPort)
@@ -126,4 +179,44 @@ func run() error {
 
 	log.Info("server stopped cleanly")
 	return nil
+}
+
+// buildJobManager wires the job manager with the generate and migrate runners.
+func buildJobManager(log *zap.Logger, sourceDB, targetDB *gorm.DB) (*jobs.Manager, error) {
+	manager, err := jobs.New(repository.NewJobExecutionRepository(targetDB), jobs.WithLogger(log))
+	if err != nil {
+		return nil, err
+	}
+
+	store, err := generatorpostgres.NewPostgresStore(sourceDB, generator.DefaultBatchSize)
+	if err != nil {
+		return nil, fmt.Errorf("build generator store: %w", err)
+	}
+	if err := manager.Register(jobs.TypeGenerate, jobs.NewGenerateRunner(store)); err != nil {
+		return nil, fmt.Errorf("register generate runner: %w", err)
+	}
+
+	src, err := etlpostgres.NewSource(sourceDB)
+	if err != nil {
+		return nil, fmt.Errorf("build etl source: %w", err)
+	}
+	loader, err := etlpostgres.NewLoader(targetDB)
+	if err != nil {
+		return nil, fmt.Errorf("build etl loader: %w", err)
+	}
+	if err := manager.Register(jobs.TypeMigrate, jobs.NewMigrateRunner(src, loader, etl.WithLogger(log))); err != nil {
+		return nil, fmt.Errorf("register migrate runner: %w", err)
+	}
+
+	return manager, nil
+}
+
+// buildScheduler wires the cron scheduler over the lab_target schedules table.
+func buildScheduler(log *zap.Logger, targetDB *gorm.DB, starter scheduler.JobStarter) (*scheduler.Scheduler, error) {
+	return scheduler.New(
+		repository.NewCronScheduleRepository(targetDB),
+		starter,
+		scheduler.WithLogger(log),
+		scheduler.WithValidCommands(jobs.TypeGenerate, jobs.TypeMigrate),
+	)
 }

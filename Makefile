@@ -1,4 +1,4 @@
-.PHONY: build run test lint migrate-up migrate-down docker-up docker-down docker-logs docker-reset certs swagger
+.PHONY: build run test lint migrate-up migrate-down migrate-status docker-up docker-down docker-logs docker-reset certs swagger
 
 # Docker Compose interface. Prefer the Compose v2 plugin (`docker compose`).
 # When the repo-root .env exists it is passed to Compose for variable
@@ -23,6 +23,10 @@ migrate-up:
 
 migrate-down:
 	cd backend && go run ./cmd/migrate down
+
+# Show applied/pending migrations for both databases.
+migrate-status:
+	cd backend && go run ./cmd/migrate status
 
 # Generate locally-trusted TLS certs for https://godata.josebianco.local
 certs:

@@ -4,6 +4,8 @@ package router
 
 import (
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"go.uber.org/zap"
 
 	"github.com/josebianco/go-vue-data-lab/internal/auth"
@@ -12,7 +14,9 @@ import (
 	"github.com/josebianco/go-vue-data-lab/internal/service"
 )
 
-// Dependencies holds the collaborators required to build the router.
+// Dependencies holds the collaborators required to build the router. The
+// only mandatory fields are Logger and Version; everything else is optional so
+// the shape stays backward compatible.
 type Dependencies struct {
 	Logger  *zap.Logger
 	Version string
@@ -22,6 +26,47 @@ type Dependencies struct {
 	// for tests and for bootstrapping the server without a database).
 	AuthService  service.AuthService
 	TokenManager *auth.JWTManager
+
+	// CORS configures the cross-origin middleware. The zero value uses safe
+	// local development defaults.
+	CORS middleware.CORSConfig
+
+	// Data is the lab_source read port. When nil, the /api/v1/source group
+	// is not registered (useful for tests and for deployments without a
+	// data service).
+	Data service.SourceData
+
+	// Target is the lab_target read port. When nil, the /api/v1/target
+	// group is not registered.
+	Target service.TargetData
+
+	// Jobs is the job control port. When nil, the /api/v1/jobs group is not
+	// registered.
+	Jobs service.JobControl
+
+	// Scheduler is the cron schedule control port. When nil, the
+	// /api/v1/scheduler group is not registered.
+	Scheduler service.SchedulerControl
+
+	// Admin is the error-log read port. It is only wired when AdminMiddleware
+	// is also provided: the /api/v1/admin group is registered exclusively
+	// guarded, so error logs can never be exposed by default.
+	Admin service.ErrorLogs
+
+	// Middleware is an optional hook applied to the /api/v1/source,
+	// /api/v1/target, /api/v1/jobs and /api/v1/scheduler groups only. It
+	// exists so auth/RBAC can be attached later without importing the auth
+	// package here; pass nil to leave the groups open.
+	Middleware []gin.HandlerFunc
+
+	// WriteMiddleware is an optional hook applied on top of Middleware to the
+	// mutating routes (POST/PUT/DELETE) of the source, jobs and scheduler
+	// groups. It is where write-level RBAC (e.g. admin/operator) is attached.
+	WriteMiddleware []gin.HandlerFunc
+
+	// AdminMiddleware guards the /api/v1/admin group (auth + admin-only RBAC).
+	// When empty the group is not registered at all.
+	AdminMiddleware []gin.HandlerFunc
 }
 
 // New builds the Gin engine with middleware and the v1 API routes registered.
@@ -36,6 +81,12 @@ func New(deps Dependencies) *gin.Engine {
 	engine := gin.New()
 	engine.Use(middleware.Recovery(deps.Logger))
 	engine.Use(middleware.RequestLogger(deps.Logger))
+	engine.Use(middleware.CORS(deps.CORS))
+
+	// Consistent 404 envelope for unknown routes.
+	engine.NoRoute(func(c *gin.Context) {
+		handler.RespondNotFound(c, "route not found")
+	})
 
 	health := handler.NewHealthHandler(deps.Version)
 
@@ -46,8 +97,16 @@ func New(deps Dependencies) *gin.Engine {
 		if deps.AuthService != nil && deps.TokenManager != nil {
 			registerAuthRoutes(v1, deps.AuthService, deps.TokenManager)
 		}
-		// Future route groups (jobs, data, admin) are registered here.
+		registerSourceRoutes(v1, deps)
+		registerTargetRoutes(v1, deps)
+		registerJobRoutes(v1, deps)
+		registerSchedulerRoutes(v1, deps)
+		registerAdminRoutes(v1, deps)
 	}
+
+	// Swagger UI at /swagger/index.html (OpenAPI 3.x spec served from the
+	// generated docs package imported by the entrypoint).
+	engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	return engine
 }
@@ -70,4 +129,140 @@ func registerAuthRoutes(v1 *gin.RouterGroup, svc service.AuthService, tokens *au
 			protected.POST("/logout", authHandler.Logout)
 		}
 	}
+}
+
+// registerSourceRoutes mounts the lab_source read endpoints when a data
+// service is provided, applying the optional middleware hook (e.g. auth) to
+// the group.
+func registerSourceRoutes(v1 *gin.RouterGroup, deps Dependencies) {
+	if deps.Data == nil {
+		return
+	}
+
+	source := v1.Group("/source")
+	if len(deps.Middleware) > 0 {
+		source.Use(deps.Middleware...)
+	}
+
+	h := handler.NewSourceHandler(deps.Data)
+	source.GET("/customers", h.ListCustomers)
+	source.GET("/customers/:id", h.GetCustomer)
+	source.GET("/products", h.ListProducts)
+	source.GET("/products/:id", h.GetProduct)
+	source.GET("/orders", h.ListOrders)
+	source.GET("/orders/:id", h.GetOrder)
+	source.GET("/order-items", h.ListOrderItems)
+
+	// Mutating routes live in their own subgroup so an optional write-level
+	// guard (e.g. RBAC) can be attached without affecting the read routes.
+	writes := source.Group("")
+	if len(deps.WriteMiddleware) > 0 {
+		writes.Use(deps.WriteMiddleware...)
+	}
+	writes.POST("/customers", h.CreateCustomer)
+	writes.PUT("/customers/:id", h.UpdateCustomer)
+	writes.DELETE("/customers/:id", h.DeleteCustomer)
+	writes.POST("/products", h.CreateProduct)
+	writes.PUT("/products/:id", h.UpdateProduct)
+	writes.DELETE("/products/:id", h.DeleteProduct)
+	writes.POST("/orders", h.CreateOrder)
+	writes.PUT("/orders/:id", h.UpdateOrder)
+	writes.DELETE("/orders/:id", h.DeleteOrder)
+}
+
+// registerTargetRoutes mounts the lab_target read endpoints (entity reads plus
+// analytics) when a target data service is provided, applying the optional
+// middleware hook (e.g. auth) to the group.
+func registerTargetRoutes(v1 *gin.RouterGroup, deps Dependencies) {
+	if deps.Target == nil {
+		return
+	}
+
+	target := v1.Group("/target")
+	if len(deps.Middleware) > 0 {
+		target.Use(deps.Middleware...)
+	}
+
+	h := handler.NewTargetHandler(deps.Target)
+	target.GET("/customers", h.ListCustomers)
+	target.GET("/customers/:id", h.GetCustomer)
+	target.GET("/products", h.ListProducts)
+	target.GET("/products/:id", h.GetProduct)
+	target.GET("/orders", h.ListOrders)
+	target.GET("/orders/:id", h.GetOrder)
+
+	analytics := target.Group("/analytics")
+	analytics.GET("/summary", h.AnalyticsSummary)
+	analytics.GET("/top-products", h.TopProducts)
+	analytics.GET("/top-customers", h.TopCustomers)
+}
+
+// registerJobRoutes mounts the job control endpoints when a job control
+// service is provided, applying the optional middleware hook (e.g. auth) to
+// the group.
+func registerJobRoutes(v1 *gin.RouterGroup, deps Dependencies) {
+	if deps.Jobs == nil {
+		return
+	}
+
+	jobsGroup := v1.Group("/jobs")
+	if len(deps.Middleware) > 0 {
+		jobsGroup.Use(deps.Middleware...)
+	}
+
+	h := handler.NewJobsHandler(deps.Jobs)
+	control := jobsGroup.Group("")
+	if len(deps.WriteMiddleware) > 0 {
+		control.Use(deps.WriteMiddleware...)
+	}
+	control.POST("/generate/start", h.StartGenerate)
+	control.POST("/migrate/start", h.StartMigrate)
+	control.POST("/stop", h.Stop)
+
+	jobsGroup.GET("/status", h.Status)
+	jobsGroup.GET("/history", h.History)
+	jobsGroup.GET("/progress", h.Progress)
+}
+
+// registerSchedulerRoutes mounts the cron schedule endpoints when a scheduler
+// service is provided, applying the optional middleware hook (e.g. auth) to
+// the group.
+func registerSchedulerRoutes(v1 *gin.RouterGroup, deps Dependencies) {
+	if deps.Scheduler == nil {
+		return
+	}
+
+	sched := v1.Group("/scheduler")
+	if len(deps.Middleware) > 0 {
+		sched.Use(deps.Middleware...)
+	}
+
+	h := handler.NewSchedulerHandler(deps.Scheduler)
+	sched.GET("/jobs", h.List)
+
+	control := sched.Group("")
+	if len(deps.WriteMiddleware) > 0 {
+		control.Use(deps.WriteMiddleware...)
+	}
+	control.POST("/jobs", h.Create)
+	control.PUT("/jobs/:id", h.Update)
+	control.DELETE("/jobs/:id", h.Delete)
+	control.POST("/jobs/:id/enable", h.Enable)
+	control.POST("/jobs/:id/disable", h.Disable)
+	control.POST("/jobs/:id/run", h.Run)
+}
+
+// registerAdminRoutes mounts the admin-only operational endpoints. It is a
+// no-op unless both an admin port and an admin guard are configured, so the
+// error log endpoint can never be registered open.
+func registerAdminRoutes(v1 *gin.RouterGroup, deps Dependencies) {
+	if deps.Admin == nil || len(deps.AdminMiddleware) == 0 {
+		return
+	}
+
+	admin := v1.Group("/admin")
+	admin.Use(deps.AdminMiddleware...)
+
+	h := handler.NewAdminHandler(deps.Admin)
+	admin.GET("/logs/errors", h.Errors)
 }
