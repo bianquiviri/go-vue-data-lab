@@ -209,10 +209,27 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
   ya hay unit tests de `mapPgError` en `errors_unit_test.go`).
 - `docs/ISSUES.md` es un backlog estático: no se marcan checkboxes (ni siquiera tareas ya hechas);
   el estado real vive en este MEMORY.
+- **Issue #37 (GitHub)**: pasar la UI del frontend a **inglés** — cadenas en español en
+  `config/nav.ts`, `router/index.ts`, `LoginView.vue`, `AppLayout.vue`, `PlaceholderView.vue`
+  e `index.html` (`lang="es"`), + tests que las afirman. Decisión anotada: inglés hardcodeado,
+  sin librería i18n (solo hay un idioma).
+- **Issue #38 (GitHub)**: dar **color** al tema — la paleta es gris puro (`oklch(x 0 0)`, croma 0
+  en todos los tokens, `chart-1..5` también grises ⇒ analítica ilegible). Alcance mínimo:
+  `--primary/--ring/--accent/--sidebar-primary/--chart-1..5` con matiz y contraste AA medido.
+  Extensión opcional: selector de acento (store `accent.ts` aparte, `gdl.accent`, anti-flash).
+- **Issue #39 (GitHub)**: landing page pública en `/` — crear `LandingView` + `PublicLayout`,
+  mover Dashboard a `/dashboard`. **Cuidado**: `config/nav.ts` tiene el item Dashboard con
+  `to: '/'` y el router filtra `item.to !== '/'`; hay que cambiar ambos juntos o se duplica la
+  ruta. Decisión pendiente: qué hace `/` con sesión iniciada (recomendado: redirect a
+  `/dashboard`). El copy va en inglés (encaja con #37).
 - Completar Issues #2+ (migraciones de negocio, frontend).
 
 ## Siguiente paso
 - **T2 secureid**: cablear el codec en handlers (paths `:id` + IDs de responses JSON),
   inyectar en `cmd/api/main.go`, regenerar swagger, tests actualizados.
-- Frontend Issues #20-#24: tablas CRUD, jobs/scheduler, admin logs, analytics.
+- Frontend: **#37** (inglés), **#38** (color) y **#39** (landing en `/`) son puramente
+  frontend y no tocan el backend. Secuenciarlos: **#39** primero (mueve el Dashboard a
+  `/dashboard` y reestructura router/nav), luego **#37** (copy en inglés de landing + resto)
+  y **#38** (color; la landing es buen banco de pruebas).
+- Luego Issues #20-#24: tablas CRUD, jobs/scheduler, admin logs, analytics.
 - Considerar rate limiting / auditoría de escrituras y logout stateful (denylist de tokens).
