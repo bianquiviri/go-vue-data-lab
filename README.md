@@ -18,17 +18,22 @@ A high-performance platform for concurrent data processing, massive simulation, 
 
 Docker Compose runs **PostgreSQL** and **Caddy**; the Go backend runs on the
 **host** via `make run` (port `8080`) and the frontend runs on the **host** via
-`npm run dev` (port `5173`). Caddy terminates TLS for two local hosts:
+`npm run dev` (port `5174`).
 
-| Host                                   | Proxies to                  |
-| -------------------------------------- | --------------------------- |
-| `https://apidatago.josebianco.local`   | `host.docker.internal:8080` (Go API) |
-| `https://frontgodata.josebianco.local` | `host.docker.internal:5173` (Vite dev server) |
+**Port note:** this machine's `taskflow` stack already owns `80`/`443`/`5173`,
+so the lab uses **`8443` (HTTPS)**, `8081` (HTTP) and `5174` (Vite). Caddy
+terminates TLS for two local hosts:
 
-The browser talks only to `frontgodata...` (same origin); Vite's dev proxy
+| Host                                          | Proxies to                          |
+| --------------------------------------------- | ----------------------------------- |
+| `https://apidatago.josebianco.local:8443`     | `host.docker.internal:8080` (Go API) |
+| `https://frontgodata.josebianco.local:8443`   | `host.docker.internal:5174` (Vite dev server) |
+
+The browser talks only to `frontgodata...:8443` (same origin); Vite's dev proxy
 forwards `/api` and `/swagger` to the backend on `localhost:8080`, so no CORS
-is needed on that path. `CORS_ALLOWED_ORIGINS` still lists both lab origins for
-direct API calls (e.g. Swagger UI served from `apidatago...`).
+is needed on that path. `CORS_ALLOWED_ORIGINS` still lists both lab origins
+(with port) for direct API calls (e.g. Swagger UI served from
+`apidatago...:8443`).
 
 ### Prerequisites
 
@@ -109,21 +114,21 @@ make migrate-up         # apply SQL migrations (first run / after changes)
 make run                # backend on http://localhost:8080
 ```
 
-API check: **https://apidatago.josebianco.local/api/v1/health**
-Swagger UI: **https://apidatago.josebianco.local/swagger/index.html**
+API check: **https://apidatago.josebianco.local:8443/api/v1/health**
+Swagger UI: **https://apidatago.josebianco.local:8443/swagger/index.html**
 
 ### 6. Run the frontend
 
 ```bash
 cd web
 npm install             # first run only
-npm run dev             # Vite on http://localhost:5173
+npm run dev             # Vite on http://localhost:5174
 ```
 
-Then open: **https://frontgodata.josebianco.local**
+Then open: **https://frontgodata.josebianco.local:8443**
 
-The full request flow is: browser → Caddy (`:443`, TLS) →
-`host.docker.internal:5173` → Vite → (`/api` proxy) →
+The full request flow is: browser → Caddy (`:8443`, TLS) →
+`host.docker.internal:5174` → Vite → (`/api` proxy) →
 `host.docker.internal:8080` → Go backend → PostgreSQL. The database is
 reachable only on the host loopback (`127.0.0.1:5432`) and is not exposed to
 your LAN.

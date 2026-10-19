@@ -14,13 +14,16 @@ se usa).
 
 ```sh
 npm install
-npm run dev        # Vite en http://localhost:5173
+npm run dev        # Vite en http://localhost:5174
 ```
 
-El dev server está en **modo `host: true`** con `allowedHosts` para que
-`https://frontgodata.josebianco.local` (Caddy → `host.docker.internal:5173`)
-pueda proxyar hacia él. Si añades otro hostname lab, agrégalo a
-`allowedHosts` en `vite.config.ts`.
+El dev server está en **modo `host: true`** + `port: 5174` y `strictPort`
+con `allowedHosts` para que `https://frontgodata.josebianco.local:8443`
+(Caddy → `host.docker.internal:5174`) pueda proxyar hacia él.
+`strictPort` hace que falle ruidosamente si algo ocupa el 5174 (evita que
+Caddy acabe proxyando a otro servicio). Si añades otro hostname lab,
+agrégalo a `allowedHosts` en `vite.config.ts`.
+El `5173` está ocupado por `taskflow-node`, de ahí el 5174.
 
 ### Proxy a la API
 

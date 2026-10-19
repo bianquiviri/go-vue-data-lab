@@ -17,7 +17,7 @@ func validKeyB64() string {
 
 func TestLoadCORSDefaultOrigins(t *testing.T) {
 	t.Setenv("CORS_ALLOWED_ORIGINS", "")
-	t.Setenv("APP_URL", "https://frontgodata.josebianco.local")
+	t.Setenv("APP_URL", "https://frontgodata.josebianco.local:8443")
 	t.Setenv("SECURE_ID_KEY", validKeyB64())
 
 	cfg, err := config.Load()
@@ -26,9 +26,9 @@ func TestLoadCORSDefaultOrigins(t *testing.T) {
 	}
 
 	want := []string{
-		"https://frontgodata.josebianco.local",
-		"http://localhost:5173",
-		"http://127.0.0.1:5173",
+		"https://frontgodata.josebianco.local:8443",
+		"http://localhost:5174",
+		"http://127.0.0.1:5174",
 	}
 	if !reflect.DeepEqual(cfg.CORSAllowedOrigins, want) {
 		t.Errorf("CORSAllowedOrigins = %v, want %v", cfg.CORSAllowedOrigins, want)

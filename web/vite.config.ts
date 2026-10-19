@@ -14,9 +14,14 @@ export default defineConfig({
     },
   },
   server: {
-    // Caddy (https://frontgodata.josebianco.local) proxya hacia este dev
+    // Caddy (https://frontgodata.josebianco.local:8443) proxya hacia este dev
     // server: hay que escuchar en todas las interfaces y permitir el Host
     // de Caddy, o Vite responde 403 (host-check) y el contenedor no conecta.
+    // El 5173 está ocupado por taskflow-node, por eso el lab usa 5174.
+    // strictPort: si algo ocupa el puerto, falla en vez de saltar a otro y
+    // dejar a Caddy proxyando a un servicio equivocado.
+    port: 5174,
+    strictPort: true,
     host: true,
     allowedHosts: [
       'frontgodata.josebianco.local',

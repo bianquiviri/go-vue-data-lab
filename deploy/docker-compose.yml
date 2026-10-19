@@ -44,8 +44,10 @@ services:
     image: caddy:2-alpine
     container_name: lab_caddy
     ports:
-      - "80:80"
-      - "443:443"
+      # taskflow's traefik already owns 80/443 on this machine, so the lab
+      # uses 8081/8443 (URLs: https://<host>:8443).
+      - "8081:80"
+      - "8443:443"
     # Lets the container reach services running on the host (Linux needs the
     # explicit host-gateway mapping; Docker Desktop on macOS already provides it).
     extra_hosts:
