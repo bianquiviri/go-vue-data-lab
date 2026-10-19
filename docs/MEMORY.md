@@ -232,19 +232,32 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
   en todos los tokens, `chart-1..5` también grises ⇒ analítica ilegible). Alcance mínimo:
   `--primary/--ring/--accent/--sidebar-primary/--chart-1..5` con matiz y contraste AA medido.
   Extensión opcional: selector de acento (store `accent.ts` aparte, `gdl.accent`, anti-flash).
-- **Issue #39 (GitHub)**: landing page pública en `/` — crear `LandingView` + `PublicLayout`,
-  mover Dashboard a `/dashboard`. **Cuidado**: `config/nav.ts` tiene el item Dashboard con
-  `to: '/'` y el router filtra `item.to !== '/'`; hay que cambiar ambos juntos o se duplica la
-  ruta. Decisión pendiente: qué hace `/` con sesión iniciada (recomendado: redirect a
-  `/dashboard`). El copy va en inglés (encaja con #37).
+- ✅ **Issue #39 (GitHub) COMPLETADO @ 259124d (19-oct)**: `LandingView` + `PublicLayout`
+  nuevos, Dashboard movido a `/dashboard`. Copy de la landing en inglés (adelanto del #37).
+  **Trampa resuelta con 3 puntos de acoplamiento** (el issue solo anticipaba 2): `nav.ts`
+  (`to: '/'`→`'/dashboard'`), filtro del router (`item.to !== '/'` → `item.routeName !== 'dashboard'`,
+  inmune a cambios de ruta) y **`DashboardView`** (tenía el mismo filtro por `to`). Arquitectura
+  de rutas: el padre `AppLayout` sigue en `/` con `requiresAuth` y el dashboard es hijo
+  `path: 'dashboard'` — así `/` sin hijo resuelve en la landing y las URLs de secciones
+  (`/customers`, `/jobs`…) **no** se anidan bajo `/dashboard`. Guard: autenticado en `/` ⇒
+  redirect a `/dashboard`; catch-all → `/` y el guard resuelve. `LoginView` redirige tras
+  login a `{ name: 'dashboard' }`. Verificado: **104 tests, 98.23% stmts / 95.3% branches**
+  (subió), `type-check`/`lint`/`build` ✅. Decisiones del subagente a revisar: `meta.public`
+  documental (el guard no lo lee), `PublicLayout` sin toggle de tema, catch-all con doble
+  redirect.
 - Completar Issues #2+ (migraciones de negocio, frontend).
 
 ## Siguiente paso
-- **T2 secureid**: cablear el codec en handlers (paths `:id` + IDs de responses JSON),
-  inyectar en `cmd/api/main.go`, regenerar swagger, tests actualizados.
-- Frontend: **#37** (inglés), **#38** (color) y **#39** (landing en `/`) son puramente
-  frontend y no tocan el backend. Secuenciarlos: **#39** primero (mueve el Dashboard a
-  `/dashboard` y reestructura router/nav), luego **#37** (copy en inglés de landing + resto)
-  y **#38** (color; la landing es buen banco de pruebas).
+- **T2 secureid EN CURSO** (subagente backend-go, 19-oct): inyección via
+  `router.Dependencies.Codec` + context value, walk outbound en `RespondJSON`/`RespondData`/
+  `RespondPaginated`, inbound token-only (`parseUUIDParam`/`parseOptionalUUID`), bodies
+  (`data_write.go`), `make swagger`, TDD. Al terminar: revisar su entrega, `make build/test/lint`
+  y commit del orquestador.
+- Frontend: **#37** (inglés) → **#38** (color). El #39 ya está hecho; el #38 la landing es
+  buen banco de pruebas.
+- **Rama**: todo el trabajo sigue en `feature/jobs-scheduler-api` (misma rama del PR #40,
+  decisión del orquestador: no se puede ramificar de `main` porque el frontend solo existe
+  aquí, y había un subagente concurrente en `backend/`). **Ojo**: al subir, los commits nuevos
+  (#39 y T2) se cuelan en el PR #40 — decidir con el usuario si se parte en PR apilado.
 - Luego Issues #20-#24: tablas CRUD, jobs/scheduler, admin logs, analytics.
 - Considerar rate limiting / auditoría de escrituras y logout stateful (denylist de tokens).
