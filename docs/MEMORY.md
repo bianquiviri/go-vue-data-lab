@@ -49,7 +49,28 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
   Inyección vía `router.Dependencies.Codec` + context value (los respondedores son funciones
   libres). El `user_id` interno del JWT **no** se toca (va firmado, no es JSON de respuesta).
   Momento óptimo: el frontend aún no consume IDs (#20-#24 son placeholders) ⇒ romper contrato
-  es gratis. Pendiente: TDD de los 5 bloques + `make swagger`.
+  es gratis.
+- ✅ **T2 secureid COMPLETADO @ 3ac309f (19-oct, revisado por el orquestador)**: `handler/secureid.go`
+  nuevo (`WithCodec`/`codecFrom`, walk `sealJSONValue`/`sealInto`/`sealIDInto` con `json.Decoder`
+  preservando orden de claves y escaping, `isOpaqueIDKey` = `id` exacto o sufijo `_id`,
+  `openInboundID` token-only, `invalidIDHint`, `respondInvalidID`). DTOs de borde en `handler`
+  (`OrderCreateRequest`/`OrderItemRequest`, ids `string`); el servicio mantiene `uuid.UUID`.
+  `RespondJSON` sella, `RespondData` delega, `RespondPaginated` intacto (meta nunca sellada).
+  Login/Refresh/Me pasan de `c.JSON` a `RespondJSON`. Swagger regenerado (25 menciones
+  "opaque token"). **Fail-closed confirmado**: `config.Load()` → error si falta `SECURE_ID_KEY`,
+  `secureid.New` → error si la clave es inválida, `main.go` propaga con `%w`; sin codec no arranca.
+  **E2E verificado en vivo** (binario nuevo en `:8080`): id sellado en lista y detalle, determinismo
+  list↔detail, `GET /customers/{token}` 200, UUID crudo → 400 `must be an opaque id`, token corrupto
+  → 400, filtro query por token 200 / por UUID crudo 400, `order_items.id` (int64) → token string,
+  `/auth/me` y `/auth/refresh` con id sellado, swagger 200, todo vía Caddy 200.
+  Cobertura: `handler` 87.3%→**88.7%**, `router` 99.1%, `secureid` 91.0%. `make build`/`go vet`/
+  `go test -race` (21 paquetes ok) limpios.
+- ⚠️ **`make lint` SIGUE EN ROJO — 8 hallazgos PREEXISTENTES (0 del T2, verificado cruzando los
+  archivos del commit)**: `config/config_test.go`, `config/config_cors_test.go`,
+  `secureid/secureid.go:115` (SA9003 rama vacía, de T1), `secureid/secureid_test.go` ×2,
+  `migrate/migrate.go:46` (`fileRef` sin usar), `worker/worker_test.go` ×3 (`p.Submit` sin
+  comprobar). **Pendiente decidir un bloque de saneamiento de lint** (no hecho para no ampliar
+  el scope del T2).
 - **Frontend Bloque 1 completo @ 0a56550 (Issues #17-#19)**: scaffold `web/` terminado tras
   una sesión previa interrumpida — `LoginView`, `AppLayout` (sidebar RBAC por rol, header con
   email/rol, toggle tema Claro/Oscuro/Sistema), `DashboardView` (tarjetas por sección), `PlaceholderView`
@@ -248,16 +269,15 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
 - Completar Issues #2+ (migraciones de negocio, frontend).
 
 ## Siguiente paso
-- **T2 secureid EN CURSO** (subagente backend-go, 19-oct): inyección via
-  `router.Dependencies.Codec` + context value, walk outbound en `RespondJSON`/`RespondData`/
-  `RespondPaginated`, inbound token-only (`parseUUIDParam`/`parseOptionalUUID`), bodies
-  (`data_write.go`), `make swagger`, TDD. Al terminar: revisar su entrega, `make build/test/lint`
-  y commit del orquestador.
-- Frontend: **#37** (inglés) → **#38** (color). El #39 ya está hecho; el #38 la landing es
-  buen banco de pruebas.
+- ✅ **T2 secureid cerrado** (@ 3ac309f) — ver arriba. El frontend `web/` **aún no consume
+  tokens**: al construir las tablas CRUD (#20-#24) los ids que reciba de la API son tokens
+  opacos y hay que **pasarlos tal cual** de vuelta en paths/filtros/bodies (no reinterpretarlos).
+- **Pendiente autorización del usuario**: subir los 3 commits nuevos (decisiones T2, #39, T2) —
+  decidir si van al **PR #40** o se parte en un **PR apilado**.
+- **Decidir bloque de saneamiento de `make lint`** (8 hallazgos preexistentes).
+- Frontend: **#37** (inglés) → **#38** (color). El #39 ya está hecho; la landing es buen banco
+  de pruebas del #38.
 - **Rama**: todo el trabajo sigue en `feature/jobs-scheduler-api` (misma rama del PR #40,
-  decisión del orquestador: no se puede ramificar de `main` porque el frontend solo existe
-  aquí, y había un subagente concurrente en `backend/`). **Ojo**: al subir, los commits nuevos
-  (#39 y T2) se cuelan en el PR #40 — decidir con el usuario si se parte en PR apilado.
+  decisión del orquestador: no se puede ramificar de `main` porque el frontend solo existe aquí).
 - Luego Issues #20-#24: tablas CRUD, jobs/scheduler, admin logs, analytics.
 - Considerar rate limiting / auditoría de escrituras y logout stateful (denylist de tokens).
