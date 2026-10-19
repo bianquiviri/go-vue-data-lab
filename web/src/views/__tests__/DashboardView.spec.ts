@@ -14,7 +14,7 @@ async function mountDashboard(role: 'admin' | 'viewer' = 'admin') {
   auth.initialized = true
 
   const router = createAppRouter()
-  await router.push('/')
+  await router.push('/dashboard')
   await router.isReady()
 
   const wrapper = mount(DashboardView, {

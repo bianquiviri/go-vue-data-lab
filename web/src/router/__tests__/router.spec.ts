@@ -32,11 +32,19 @@ describe('router/guards', () => {
     expect(router.currentRoute.value.query.redirect).toBe('/admin/logs')
   })
 
-  it('/login redirige a / cuando ya hay sesión', async () => {
+  it('el dashboard (/dashboard) exige sesión', async () => {
+    const router = createAppRouter()
+    await router.push('/dashboard')
+    expect(router.currentRoute.value.name).toBe('login')
+    expect(router.currentRoute.value.query.redirect).toBe('/dashboard')
+  })
+
+  it('/login redirige a /dashboard cuando ya hay sesión', async () => {
     seedSession()
     const router = createAppRouter()
     await router.push('/login')
     expect(router.currentRoute.value.name).toBe('dashboard')
+    expect(router.currentRoute.value.path).toBe('/dashboard')
   })
 
   it('/login con query.redirect devuelve al destino original', async () => {
@@ -60,17 +68,56 @@ describe('router/guards', () => {
     expect(router.currentRoute.value.name).toBe('admin-logs')
   })
 
-  it('una ruta desconocida se resuelve en /', async () => {
+  // --- Landing pública (Issue #39) ---
+
+  it('/ sin sesión muestra la landing (pública, sin redirect a login)', async () => {
+    const router = createAppRouter()
+    await router.push('/')
+    expect(router.currentRoute.value.name).toBe('landing')
+    expect(router.currentRoute.value.path).toBe('/')
+  })
+
+  it('/ con sesión redirige a /dashboard', async () => {
+    seedSession()
+    const router = createAppRouter()
+    await router.push('/')
+    expect(router.currentRoute.value.name).toBe('dashboard')
+    expect(router.currentRoute.value.path).toBe('/dashboard')
+  })
+
+  it('la landing no exige sesión y está marcada como pública', async () => {
+    const router = createAppRouter()
+    await router.push('/')
+    const record = router.getRoutes().find((route) => route.name === 'landing')
+    expect(record).toBeDefined()
+    expect(record?.meta.public).toBe(true)
+    expect(record?.meta.requiresAuth).toBeUndefined()
+  })
+
+  it('/dashboard con sesión entra al dashboard', async () => {
+    seedSession()
+    const router = createAppRouter()
+    await router.push('/dashboard')
+    expect(router.currentRoute.value.name).toBe('dashboard')
+  })
+
+  it('una ruta desconocida con sesión se resuelve en /dashboard', async () => {
     seedSession()
     const router = createAppRouter()
     await router.push('/esto-no-existe')
     expect(router.currentRoute.value.name).toBe('dashboard')
   })
 
-  it('el dashboard es la ruta por defecto', async () => {
-    seedSession()
+  it('una ruta desconocida sin sesión cae en la landing', async () => {
     const router = createAppRouter()
-    await router.push('/')
-    expect(router.currentRoute.value.name).toBe('dashboard')
+    await router.push('/esto-no-existe')
+    expect(router.currentRoute.value.name).toBe('landing')
+  })
+
+  it('no hay rutas duplicadas (una sola ruta por nombre)', async () => {
+    const router = createAppRouter()
+    const names = router.getRoutes().map((route) => route.name)
+    const filtered = names.filter((name) => name !== undefined)
+    expect(new Set(filtered).size).toBe(filtered.length)
   })
 })

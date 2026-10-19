@@ -9,7 +9,7 @@ import { useAuthStore } from '@/stores/auth'
 const auth = useAuthStore()
 
 /** Secciones del laboratorio (sin el dashboard) visibles para el rol actual. */
-const sections = computed(() => visibleNavItems(auth.role).filter((item) => item.to !== '/'))
+const sections = computed(() => visibleNavItems(auth.role).filter((item) => item.routeName !== 'dashboard'))
 
 const firstName = computed(() => {
   const email = auth.user?.email ?? ''

@@ -44,8 +44,9 @@ async function onSubmit(): Promise<void> {
 
   try {
     await auth.login({ email: email.value.trim(), password: password.value })
-    // Devuelve al usuario a la ruta que originó la redirección al login.
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
+    // Devuelve al usuario a la ruta que originó la redirección al login
+    // (o al dashboard por defecto; la landing no es para usuarios con sesión).
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : { name: 'dashboard' as const }
     await router.push(redirect)
   } catch {
     // El error ya quedó expuesto en auth.error (envelope {"error":...}).

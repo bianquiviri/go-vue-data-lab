@@ -31,7 +31,7 @@ export const NAV_ITEMS: NavItem[] = [
   {
     title: 'Dashboard',
     routeName: 'dashboard',
-    to: '/',
+    to: '/dashboard',
     icon: LayoutDashboard,
     description: 'Resumen general del laboratorio',
   },
