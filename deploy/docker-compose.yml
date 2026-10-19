@@ -3,7 +3,9 @@
 # Services:
 #   - postgres : PostgreSQL 15 with two application databases (lab_source, lab_target)
 #                created by init-db.sh on first boot.
-#   - caddy    : local reverse proxy / TLS terminator for https://godata.josebianco.local
+#   - caddy    : local reverse proxy / TLS terminator for
+#                https://apidatago.josebianco.local (API) and
+#                https://frontgodata.josebianco.local (web)
 #                forwarding to the backend running on the HOST (make run -> :8080).
 #
 # The backend is intentionally NOT part of this compose file: it runs on the host.

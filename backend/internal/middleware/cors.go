@@ -12,7 +12,8 @@ import (
 // DefaultCORSAllowedOrigins is used when no origins are configured: the local
 // HTTPS app URL plus the Vite dev-server origins.
 var DefaultCORSAllowedOrigins = []string{
-	"https://godata.josebianco.local",
+	"https://frontgodata.josebianco.local",
+	"https://apidatago.josebianco.local",
 	"http://localhost:5173",
 	"http://127.0.0.1:5173",
 }

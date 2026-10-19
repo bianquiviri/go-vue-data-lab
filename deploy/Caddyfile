@@ -2,23 +2,42 @@
 #
 # TLS strategy: mkcert-generated certificates mounted from ./certs (read-only).
 # mkcert installs a locally-trusted root CA, so browsers show a valid padlock
-# for https://godata.josebianco.local without warnings.
+# for both hosts without warnings.
+#
+# Hosts (mapped to 127.0.0.1 in /etc/hosts):
+#   apidatago.josebianco.local  -> backend Go (host.docker.internal:8080)
+#   frontgodata.josebianco.local -> Vite dev server (host.docker.internal:5173)
 #
 # Generate the certificates once with:
 #     make certs          # or: ./deploy/gen-certs.sh
 #
-# NOTE: the backend runs on the HOST (make run), not inside the compose network,
-# so we proxy to host.docker.internal (resolved via extra_hosts in compose).
-# localhost would incorrectly point at the Caddy container itself.
+# NOTE: the backend and the Vite dev server run on the HOST (make run /
+# npm run dev), not inside the compose network, so we proxy to
+# host.docker.internal (resolved via extra_hosts in compose).
 
-godata.josebianco.local {
+apidatago.josebianco.local {
 	encode zstd gzip
 
 	reverse_proxy host.docker.internal:8080 {
 		header_up X-Real-IP {remote_host}
 	}
 
-	tls /certs/godata.josebianco.local.pem /certs/godata.josebianco.local-key.pem
+	tls /certs/apidatago.josebianco.local.pem /certs/apidatago.josebianco.local-key.pem
+
+	log {
+		output stdout
+		format console
+	}
+}
+
+frontgodata.josebianco.local {
+	encode zstd gzip
+
+	reverse_proxy host.docker.internal:5173 {
+		header_up X-Real-IP {remote_host}
+	}
+
+	tls /certs/frontgodata.josebianco.local.pem /certs/frontgodata.josebianco.local-key.pem
 
 	log {
 		output stdout

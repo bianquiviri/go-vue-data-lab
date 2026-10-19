@@ -59,9 +59,9 @@ func TestCORSAllowedOriginSimpleRequest(t *testing.T) {
 
 func TestCORSDefaultOriginFromDefaultList(t *testing.T) {
 	rec := runCORS(t, middleware.CORSConfig{}, http.MethodGet, "/x",
-		map[string]string{"Origin": "https://godata.josebianco.local"})
+		map[string]string{"Origin": "https://frontgodata.josebianco.local"})
 
-	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "https://godata.josebianco.local" {
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "https://frontgodata.josebianco.local" {
 		t.Errorf("Allow-Origin = %q, want app URL origin", got)
 	}
 }

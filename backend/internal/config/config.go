@@ -62,7 +62,7 @@ func Load() (*Config, error) {
 		ServerPort:             getEnv("SERVER_PORT", "8080"),
 		ServerHost:             getEnv("SERVER_HOST", "0.0.0.0"),
 		AppEnv:                 getEnv("APP_ENV", "development"),
-		AppURL:                 getEnv("APP_URL", "https://godata.josebianco.local"),
+		AppURL:                 getEnv("APP_URL", "https://frontgodata.josebianco.local"),
 		JWTSecret:              getEnv("JWT_SECRET", "your_jwt_secret_here_change_in_production"),
 		BootstrapAdminEmail:    getEnv("BOOTSTRAP_ADMIN_EMAIL", "root@gmail.com"),
 		BootstrapAdminPassword: getEnv("BOOTSTRAP_ADMIN_PASSWORD", "change_me_123!"),
