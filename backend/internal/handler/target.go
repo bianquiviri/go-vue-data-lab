@@ -82,7 +82,7 @@ func (h *TargetHandler) ListCustomers(c *gin.Context) {
 //	@Description	Returns a single customer from lab_target by id.
 //	@Tags			target
 //	@Produce		json
-//	@Param			id	path		string	true	"Customer UUID"
+//	@Param			id	path		string	true	"Customer id (opaque token)"
 //	@Success		200	{object}	models.Customer
 //	@Failure		400	{object}	ErrorResponse
 //	@Failure		404	{object}	ErrorResponse
@@ -144,7 +144,7 @@ func (h *TargetHandler) ListProducts(c *gin.Context) {
 //	@Description	Returns a single product from lab_target by id.
 //	@Tags			target
 //	@Produce		json
-//	@Param			id	path		string	true	"Product UUID"
+//	@Param			id	path		string	true	"Product id (opaque token)"
 //	@Success		200	{object}	models.Product
 //	@Failure		400	{object}	ErrorResponse
 //	@Failure		404	{object}	ErrorResponse
@@ -171,7 +171,7 @@ func (h *TargetHandler) GetProduct(c *gin.Context) {
 //	@Produce		json
 //	@Param			page		query		int		false	"Page number (1-based)"	minimum(1)
 //	@Param			per_page	query		int		false	"Items per page (max 100)"	minimum(1)	maximum(100)
-//	@Param			customer_id	query		string	false	"Filter by customer UUID"
+//	@Param			customer_id	query		string	false	"Filter by customer id (opaque token)"
 //	@Param			status		query		string	false	"Filter by order status"
 //	@Param			date_from	query		string	false	"Order date >= (RFC3339 or YYYY-MM-DD)"
 //	@Param			date_to		query		string	false	"Order date <= (RFC3339 or YYYY-MM-DD)"
@@ -226,10 +226,10 @@ func (h *TargetHandler) ListOrders(c *gin.Context) {
 // GetOrder handles GET /api/v1/target/orders/:id, including its order items.
 //
 //	@Summary		Get a target order with items
-//	@Description	Returns a single order from lab_target by id, including its order items.
+//	@Description	Returns a single order from lab_target by id, including its order items. Every id (and each item id) is returned as an opaque token string.
 //	@Tags			target
 //	@Produce		json
-//	@Param			id	path		string	true	"Order UUID"
+//	@Param			id	path		string	true	"Order id (opaque token)"
 //	@Success		200	{object}	models.Order
 //	@Failure		400	{object}	ErrorResponse
 //	@Failure		404	{object}	ErrorResponse

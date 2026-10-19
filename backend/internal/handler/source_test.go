@@ -147,13 +147,15 @@ func (f *fakeSourceService) GetOrderItem(ctx context.Context, id int64) (models.
 
 var _ service.SourceData = (*fakeSourceService)(nil)
 
-// do executes a GET request against the source handler routes.
+// do executes a GET request against the source handler routes. The opaque id
+// codec is wired, so requests must use sealed tokens and responses seal ids.
 func do(t *testing.T, svc service.SourceData, target string) *httptest.ResponseRecorder {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 
 	h := handler.NewSourceHandler(svc)
 	engine := gin.New()
+	engine.Use(handler.WithCodec(testCodec))
 	engine.GET("/api/v1/source/customers", h.ListCustomers)
 	engine.GET("/api/v1/source/customers/:id", h.GetCustomer)
 	engine.GET("/api/v1/source/products", h.ListProducts)
@@ -293,7 +295,7 @@ func TestSourceGetCustomer(t *testing.T) {
 			return models.Customer{ID: got, Email: "alice@example.com", FirstName: "Alice"}, nil
 		}
 
-		rec := do(t, svc, "/api/v1/source/customers/"+id.String())
+		rec := do(t, svc, "/api/v1/source/customers/"+sealID(id))
 
 		if rec.Code != http.StatusOK {
 			t.Fatalf("expected %d, got %d (body: %s)", http.StatusOK, rec.Code, rec.Body.String())
@@ -301,16 +303,16 @@ func TestSourceGetCustomer(t *testing.T) {
 		if gotID != id {
 			t.Errorf("service id = %s, want %s", gotID, id)
 		}
-		var body models.Customer
-		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-			t.Fatalf("decode customer: %v", err)
+		body := decodeObject(t, rec)
+		if body["id"] != sealID(id) {
+			t.Errorf("response id = %v, want sealed token", body["id"])
 		}
-		if body.Email != "alice@example.com" {
+		if body["email"] != "alice@example.com" {
 			t.Errorf("unexpected body: %+v", body)
 		}
 	})
 
-	t.Run("invalid uuid", func(t *testing.T) {
+	t.Run("invalid token", func(t *testing.T) {
 		svc := newFakeService(t)
 
 		rec := do(t, svc, "/api/v1/source/customers/not-a-uuid")
@@ -334,7 +336,7 @@ func TestSourceGetCustomer(t *testing.T) {
 			return models.Customer{}, service.ErrNotFound
 		}
 
-		rec := do(t, svc, "/api/v1/source/customers/"+id.String())
+		rec := do(t, svc, "/api/v1/source/customers/"+sealID(id))
 
 		if rec.Code != http.StatusNotFound {
 			t.Fatalf("expected %d, got %d", http.StatusNotFound, rec.Code)
@@ -354,12 +356,45 @@ func TestSourceGetCustomer(t *testing.T) {
 			return models.Customer{}, errors.New("boom")
 		}
 
-		rec := do(t, svc, "/api/v1/source/customers/"+id.String())
+		rec := do(t, svc, "/api/v1/source/customers/"+sealID(id))
 
 		if rec.Code != http.StatusInternalServerError {
 			t.Fatalf("expected %d, got %d", http.StatusInternalServerError, rec.Code)
 		}
 	})
+}
+
+func TestSourceGetCustomerRawUUIDRejected(t *testing.T) {
+	id := uuid.New()
+	svc := newFakeService(t)
+
+	rec := do(t, svc, "/api/v1/source/customers/"+id.String())
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected %d, got %d (body: %s)", http.StatusBadRequest, rec.Code, rec.Body.String())
+	}
+	resp := decodeError(t, rec)
+	if resp.Error.Code != handler.CodeValidation {
+		t.Errorf("expected %s, got %q", handler.CodeValidation, resp.Error.Code)
+	}
+	fields, _ := resp.Error.Details["fields"].(map[string]any)
+	if got := fields["id"]; got != "must be an opaque id" {
+		t.Errorf("id hint = %v, want %q", got, "must be an opaque id")
+	}
+}
+
+func TestSourceListOrdersRawCustomerIDRejected(t *testing.T) {
+	svc := newFakeService(t)
+
+	rec := do(t, svc, "/api/v1/source/orders?customer_id="+uuid.NewString())
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected %d, got %d (body: %s)", http.StatusBadRequest, rec.Code, rec.Body.String())
+	}
+	fields, _ := decodeError(t, rec).Error.Details["fields"].(map[string]any)
+	if got := fields["customer_id"]; got != "must be an opaque id" {
+		t.Errorf("customer_id hint = %v, want %q", got, "must be an opaque id")
+	}
 }
 
 // --- products -------------------------------------------------------------
@@ -410,16 +445,13 @@ func TestSourceGetProduct(t *testing.T) {
 			return models.Product{ID: got, SKU: "SKU-9"}, nil
 		}
 
-		rec := do(t, svc, "/api/v1/source/products/"+id.String())
+		rec := do(t, svc, "/api/v1/source/products/"+sealID(id))
 
 		if rec.Code != http.StatusOK {
 			t.Fatalf("expected %d, got %d", http.StatusOK, rec.Code)
 		}
-		var body models.Product
-		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
-		if body.SKU != "SKU-9" {
+		body := decodeObject(t, rec)
+		if body["sku"] != "SKU-9" || body["id"] != sealID(id) {
 			t.Errorf("unexpected body: %+v", body)
 		}
 	})
@@ -430,13 +462,13 @@ func TestSourceGetProduct(t *testing.T) {
 			return models.Product{}, service.ErrNotFound
 		}
 
-		rec := do(t, svc, "/api/v1/source/products/"+id.String())
+		rec := do(t, svc, "/api/v1/source/products/"+sealID(id))
 		if rec.Code != http.StatusNotFound {
 			t.Fatalf("expected %d, got %d", http.StatusNotFound, rec.Code)
 		}
 	})
 
-	t.Run("invalid uuid", func(t *testing.T) {
+	t.Run("invalid token", func(t *testing.T) {
 		svc := newFakeService(t)
 		rec := do(t, svc, "/api/v1/source/products/nope")
 		if rec.Code != http.StatusBadRequest {
@@ -456,7 +488,7 @@ func TestSourceListOrdersParsesFilters(t *testing.T) {
 		return service.PageResult[models.Order]{Items: []models.Order{}, Total: 0, Page: p.Page, PerPage: p.PerPage}, nil
 	}
 
-	rec := do(t, svc, "/api/v1/source/orders?customer_id="+customerID.String()+"&status=paid&date_from=2024-01-01&date_to=2024-01-31")
+	rec := do(t, svc, "/api/v1/source/orders?customer_id="+sealID(customerID)+"&status=paid&date_from=2024-01-01&date_to=2024-01-31")
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected %d, got %d (body: %s)", http.StatusOK, rec.Code, rec.Body.String())
@@ -556,17 +588,23 @@ func TestSourceGetOrderIncludesItems(t *testing.T) {
 		}, nil
 	}
 
-	rec := do(t, svc, "/api/v1/source/orders/"+id.String())
+	rec := do(t, svc, "/api/v1/source/orders/"+sealID(id))
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected %d, got %d", http.StatusOK, rec.Code)
 	}
-	var body models.Order
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode order: %v", err)
+	// Order items carry int64 ids that are sealed into opaque tokens too.
+	body := decodeObject(t, rec)
+	if body["id"] != sealID(id) {
+		t.Errorf("response id = %v, want sealed token", body["id"])
 	}
-	if len(body.OrderItems) != 1 || body.OrderItems[0].Subtotal != 10 {
-		t.Errorf("expected items in payload, got %+v", body.OrderItems)
+	items, ok := body["order_items"].([]any)
+	if !ok || len(items) != 1 {
+		t.Fatalf("expected items in payload, got %+v", body["order_items"])
+	}
+	item := items[0].(map[string]any)
+	if item["id"] != sealInt64ID(1) || item["subtotal"] != 10.0 {
+		t.Errorf("unexpected item payload: %+v", item)
 	}
 }
 
@@ -577,7 +615,7 @@ func TestSourceGetOrderNotFoundAndInvalid(t *testing.T) {
 			return models.Order{}, service.ErrNotFound
 		}
 
-		rec := do(t, svc, "/api/v1/source/orders/"+uuid.NewString())
+		rec := do(t, svc, "/api/v1/source/orders/"+sealID(uuid.New()))
 		if rec.Code != http.StatusNotFound {
 			t.Fatalf("expected %d, got %d", http.StatusNotFound, rec.Code)
 		}
@@ -586,7 +624,7 @@ func TestSourceGetOrderNotFoundAndInvalid(t *testing.T) {
 		}
 	})
 
-	t.Run("invalid uuid", func(t *testing.T) {
+	t.Run("invalid token", func(t *testing.T) {
 		svc := newFakeService(t)
 		rec := do(t, svc, "/api/v1/source/orders/nope")
 		if rec.Code != http.StatusBadRequest {
@@ -599,7 +637,7 @@ func TestSourceGetOrderNotFoundAndInvalid(t *testing.T) {
 		svc.getOrder = func(context.Context, uuid.UUID) (models.Order, error) {
 			return models.Order{}, errors.New("boom")
 		}
-		rec := do(t, svc, "/api/v1/source/orders/"+uuid.NewString())
+		rec := do(t, svc, "/api/v1/source/orders/"+sealID(uuid.New()))
 		if rec.Code != http.StatusInternalServerError {
 			t.Fatalf("expected %d, got %d", http.StatusInternalServerError, rec.Code)
 		}
@@ -623,7 +661,7 @@ func TestSourceListOrderItems(t *testing.T) {
 		}, nil
 	}
 
-	rec := do(t, svc, "/api/v1/source/order-items?order_id="+orderID.String()+"&product_id="+productID.String())
+	rec := do(t, svc, "/api/v1/source/order-items?order_id="+sealID(orderID)+"&product_id="+sealID(productID))
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected %d, got %d", http.StatusOK, rec.Code)

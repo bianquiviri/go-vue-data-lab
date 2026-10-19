@@ -11,6 +11,7 @@ import (
 	"github.com/josebianco/go-vue-data-lab/internal/auth"
 	"github.com/josebianco/go-vue-data-lab/internal/handler"
 	"github.com/josebianco/go-vue-data-lab/internal/middleware"
+	"github.com/josebianco/go-vue-data-lab/internal/secureid"
 	"github.com/josebianco/go-vue-data-lab/internal/service"
 )
 
@@ -67,6 +68,13 @@ type Dependencies struct {
 	// AdminMiddleware guards the /api/v1/admin group (auth + admin-only RBAC).
 	// When empty the group is not registered at all.
 	AdminMiddleware []gin.HandlerFunc
+
+	// Codec is the opaque id codec. When provided, every response seals its
+	// id / *_id values into opaque tokens and every inbound id (path, query
+	// or body) must be an opaque token; raw UUIDs are rejected with a 400.
+	// When nil the API keeps the legacy raw-UUID contract (useful for tests
+	// and for bootstrapping the server without a key).
+	Codec *secureid.Codec
 }
 
 // New builds the Gin engine with middleware and the v1 API routes registered.
@@ -82,6 +90,9 @@ func New(deps Dependencies) *gin.Engine {
 	engine.Use(middleware.Recovery(deps.Logger))
 	engine.Use(middleware.RequestLogger(deps.Logger))
 	engine.Use(middleware.CORS(deps.CORS))
+	// Opaque id codec: installed before any route so responders seal outbound
+	// ids and the id parsers accept only opaque tokens.
+	engine.Use(handler.WithCodec(deps.Codec))
 
 	// Consistent 404 envelope for unknown routes.
 	engine.NoRoute(func(c *gin.Context) {

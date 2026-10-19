@@ -61,13 +61,15 @@ func (f *fakeTargetService) TopCustomers(ctx context.Context, limit int) ([]mode
 
 var _ service.TargetData = (*fakeTargetService)(nil)
 
-// doTarget executes a GET request against the target handler routes.
+// doTarget executes a GET request against the target handler routes. The
+// opaque id codec is wired, so requests must use sealed tokens.
 func doTarget(t *testing.T, svc service.TargetData, target string) *httptest.ResponseRecorder {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 
 	h := handler.NewTargetHandler(svc)
 	engine := gin.New()
+	engine.Use(handler.WithCodec(testCodec))
 	engine.GET("/api/v1/target/customers", h.ListCustomers)
 	engine.GET("/api/v1/target/customers/:id", h.GetCustomer)
 	engine.GET("/api/v1/target/products", h.ListProducts)
@@ -155,7 +157,7 @@ func TestTargetGetCustomer(t *testing.T) {
 			return models.Customer{ID: got, Email: "alice@example.com"}, nil
 		}
 
-		rec := doTarget(t, svc, "/api/v1/target/customers/"+id.String())
+		rec := doTarget(t, svc, "/api/v1/target/customers/"+sealID(id))
 
 		if rec.Code != http.StatusOK {
 			t.Fatalf("expected %d, got %d", http.StatusOK, rec.Code)
@@ -165,7 +167,7 @@ func TestTargetGetCustomer(t *testing.T) {
 		}
 	})
 
-	t.Run("invalid uuid", func(t *testing.T) {
+	t.Run("invalid token", func(t *testing.T) {
 		svc := newFakeTargetService(t)
 		rec := doTarget(t, svc, "/api/v1/target/customers/not-a-uuid")
 		if rec.Code != http.StatusBadRequest {
@@ -178,7 +180,7 @@ func TestTargetGetCustomer(t *testing.T) {
 		svc.getCustomer = func(context.Context, uuid.UUID) (models.Customer, error) {
 			return models.Customer{}, service.ErrNotFound
 		}
-		rec := doTarget(t, svc, "/api/v1/target/customers/"+id.String())
+		rec := doTarget(t, svc, "/api/v1/target/customers/"+sealID(id))
 		if rec.Code != http.StatusNotFound {
 			t.Fatalf("expected %d, got %d", http.StatusNotFound, rec.Code)
 		}
@@ -192,7 +194,7 @@ func TestTargetGetCustomer(t *testing.T) {
 		svc.getCustomer = func(context.Context, uuid.UUID) (models.Customer, error) {
 			return models.Customer{}, errors.New("boom")
 		}
-		rec := doTarget(t, svc, "/api/v1/target/customers/"+id.String())
+		rec := doTarget(t, svc, "/api/v1/target/customers/"+sealID(id))
 		if rec.Code != http.StatusInternalServerError {
 			t.Fatalf("expected %d, got %d", http.StatusInternalServerError, rec.Code)
 		}
@@ -225,7 +227,7 @@ func TestTargetGetProduct(t *testing.T) {
 		svc.getProduct = func(_ context.Context, got uuid.UUID) (models.Product, error) {
 			return models.Product{ID: got, SKU: "SKU-9"}, nil
 		}
-		rec := doTarget(t, svc, "/api/v1/target/products/"+id.String())
+		rec := doTarget(t, svc, "/api/v1/target/products/"+sealID(id))
 		if rec.Code != http.StatusOK {
 			t.Fatalf("expected %d, got %d", http.StatusOK, rec.Code)
 		}
@@ -236,7 +238,7 @@ func TestTargetGetProduct(t *testing.T) {
 		svc.getProduct = func(context.Context, uuid.UUID) (models.Product, error) {
 			return models.Product{}, service.ErrNotFound
 		}
-		rec := doTarget(t, svc, "/api/v1/target/products/"+id.String())
+		rec := doTarget(t, svc, "/api/v1/target/products/"+sealID(id))
 		if rec.Code != http.StatusNotFound {
 			t.Fatalf("expected %d, got %d", http.StatusNotFound, rec.Code)
 		}
@@ -252,7 +254,7 @@ func TestTargetListOrdersParsesFilters(t *testing.T) {
 		return service.PageResult[models.Order]{Items: []models.Order{}, Page: p.Page, PerPage: p.PerPage}, nil
 	}
 
-	rec := doTarget(t, svc, "/api/v1/target/orders?customer_id="+customerID.String()+"&status=paid&date_from=2024-01-01&date_to=2024-01-31")
+	rec := doTarget(t, svc, "/api/v1/target/orders?customer_id="+sealID(customerID)+"&status=paid&date_from=2024-01-01&date_to=2024-01-31")
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected %d, got %d (body: %s)", http.StatusOK, rec.Code, rec.Body.String())
@@ -270,7 +272,7 @@ func TestTargetListOrdersValidationErrors(t *testing.T) {
 		name   string
 		target string
 	}{
-		{"invalid customer uuid", "/api/v1/target/orders?customer_id=nope"},
+		{"invalid customer token", "/api/v1/target/orders?customer_id=nope"},
 		{"invalid date_from", "/api/v1/target/orders?date_from=yesterday"},
 		{"reversed range", "/api/v1/target/orders?date_from=2024-02-01&date_to=2024-01-01"},
 	}
@@ -299,17 +301,21 @@ func TestTargetGetOrderIncludesItems(t *testing.T) {
 		}, nil
 	}
 
-	rec := doTarget(t, svc, "/api/v1/target/orders/"+id.String())
+	rec := doTarget(t, svc, "/api/v1/target/orders/"+sealID(id))
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected %d, got %d", http.StatusOK, rec.Code)
 	}
-	var body models.Order
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode: %v", err)
+	body := decodeObject(t, rec)
+	if body["id"] != sealID(id) {
+		t.Errorf("response id = %v, want sealed token", body["id"])
 	}
-	if len(body.OrderItems) != 1 || body.OrderItems[0].Subtotal != 10 {
-		t.Errorf("expected items in payload, got %+v", body.OrderItems)
+	items, ok := body["order_items"].([]any)
+	if !ok || len(items) != 1 {
+		t.Fatalf("expected items in payload, got %+v", body["order_items"])
+	}
+	if item := items[0].(map[string]any); item["id"] != sealInt64ID(1) || item["subtotal"] != 10.0 {
+		t.Errorf("unexpected item payload: %+v", item)
 	}
 }
 
@@ -318,7 +324,7 @@ func TestTargetGetOrderNotFound(t *testing.T) {
 	svc.getOrder = func(context.Context, uuid.UUID) (models.Order, error) {
 		return models.Order{}, service.ErrNotFound
 	}
-	rec := doTarget(t, svc, "/api/v1/target/orders/"+uuid.NewString())
+	rec := doTarget(t, svc, "/api/v1/target/orders/"+sealID(uuid.New()))
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected %d, got %d", http.StatusNotFound, rec.Code)
 	}

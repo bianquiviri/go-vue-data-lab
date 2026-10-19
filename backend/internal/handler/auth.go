@@ -87,7 +87,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, newAuthResponse(result))
+	RespondJSON(c, http.StatusOK, newAuthResponse(result))
 }
 
 // Refresh handles POST /api/v1/auth/refresh.
@@ -109,7 +109,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, newAuthResponse(result))
+	RespondJSON(c, http.StatusOK, newAuthResponse(result))
 }
 
 // Me handles GET /api/v1/auth/me.
@@ -131,7 +131,7 @@ func (h *AuthHandler) Me(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"user": newUserResponse(user)})
+	RespondJSON(c, http.StatusOK, gin.H{"user": newUserResponse(user)})
 }
 
 // ChangePassword handles POST /api/v1/auth/change-password.

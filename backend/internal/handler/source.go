@@ -76,31 +76,31 @@ func parseDate(value string, endOfDay bool) (time.Time, bool) {
 	return time.Time{}, false
 }
 
-// parseOptionalUUID parses an optional UUID query parameter. It returns
-// ok=false after writing a 400 envelope when the value is present but invalid.
+// parseOptionalUUID parses an optional UUID query parameter. When the request
+// carries an opaque id codec the value must be an opaque token; raw UUIDs are
+// rejected. It returns ok=false after writing a 400 envelope when the value is
+// present but invalid.
 func parseOptionalUUID(c *gin.Context, name string) (*uuid.UUID, bool) {
 	raw := strings.TrimSpace(c.Query(name))
 	if raw == "" {
 		return nil, true
 	}
-	id, err := uuid.Parse(raw)
+	id, err := openInboundID(c, raw)
 	if err != nil {
-		RespondErrorDetails(c, http.StatusBadRequest, CodeValidation,
-			"invalid query parameter",
-			map[string]any{"fields": map[string]string{name: "must be a valid UUID"}})
+		respondInvalidID(c, "invalid query parameter", name, invalidIDHint(c), err)
 		return nil, false
 	}
 	return &id, true
 }
 
-// parseUUIDParam parses a required UUID path parameter. It returns ok=false
-// after writing a 400 envelope when the value is not a UUID.
+// parseUUIDParam parses a required UUID path parameter. When the request
+// carries an opaque id codec the value must be an opaque token; raw UUIDs are
+// rejected. It returns ok=false after writing a 400 envelope when the value is
+// not a valid id.
 func parseUUIDParam(c *gin.Context, name string) (uuid.UUID, bool) {
-	id, err := uuid.Parse(c.Param(name))
+	id, err := openInboundID(c, c.Param(name))
 	if err != nil {
-		RespondErrorDetails(c, http.StatusBadRequest, CodeValidation,
-			"invalid path parameter",
-			map[string]any{"fields": map[string]string{name: "must be a valid UUID"}})
+		respondInvalidID(c, "invalid path parameter", name, invalidIDHint(c), err)
 		return uuid.Nil, false
 	}
 	return id, true
@@ -159,7 +159,7 @@ func (h *SourceHandler) ListCustomers(c *gin.Context) {
 //	@Description	Returns a single customer from lab_source by id.
 //	@Tags			source
 //	@Produce		json
-//	@Param			id	path		string	true	"Customer UUID"
+//	@Param			id	path		string	true	"Customer id (opaque token)"
 //	@Success		200	{object}	models.Customer
 //	@Failure		400	{object}	ErrorResponse
 //	@Failure		404	{object}	ErrorResponse
@@ -221,7 +221,7 @@ func (h *SourceHandler) ListProducts(c *gin.Context) {
 //	@Description	Returns a single product from lab_source by id.
 //	@Tags			source
 //	@Produce		json
-//	@Param			id	path		string	true	"Product UUID"
+//	@Param			id	path		string	true	"Product id (opaque token)"
 //	@Success		200	{object}	models.Product
 //	@Failure		400	{object}	ErrorResponse
 //	@Failure		404	{object}	ErrorResponse
@@ -248,7 +248,7 @@ func (h *SourceHandler) GetProduct(c *gin.Context) {
 //	@Produce		json
 //	@Param			page		query		int		false	"Page number (1-based)"	minimum(1)
 //	@Param			per_page	query		int		false	"Items per page (max 100)"	minimum(1)	maximum(100)
-//	@Param			customer_id	query		string	false	"Filter by customer UUID"
+//	@Param			customer_id	query		string	false	"Filter by customer id (opaque token)"
 //	@Param			status		query		string	false	"Filter by order status"
 //	@Param			date_from	query		string	false	"Order date >= (RFC3339 or YYYY-MM-DD)"
 //	@Param			date_to		query		string	false	"Order date <= (RFC3339 or YYYY-MM-DD)"
@@ -319,10 +319,10 @@ func parseDateRangeParam(c *gin.Context, name, raw string, endOfDay bool) (*time
 // GetOrder handles GET /api/v1/source/orders/:id, including its order items.
 //
 //	@Summary		Get a source order with items
-//	@Description	Returns a single order from lab_source by id, including its order items.
+//	@Description	Returns a single order from lab_source by id, including its order items. Every id (and each item id) is returned as an opaque token string.
 //	@Tags			source
 //	@Produce		json
-//	@Param			id	path		string	true	"Order UUID"
+//	@Param			id	path		string	true	"Order id (opaque token)"
 //	@Success		200	{object}	models.Order
 //	@Failure		400	{object}	ErrorResponse
 //	@Failure		404	{object}	ErrorResponse
@@ -344,13 +344,13 @@ func (h *SourceHandler) GetOrder(c *gin.Context) {
 // ListOrderItems handles GET /api/v1/source/order-items.
 //
 //	@Summary		List source order items
-//	@Description	Paginated order items from lab_source, filterable by order and product.
+//	@Description	Paginated order items from lab_source, filterable by order and product. Each item id (int64) is returned as an opaque token string.
 //	@Tags			source
 //	@Produce		json
 //	@Param			page		query		int		false	"Page number (1-based)"	minimum(1)
 //	@Param			per_page	query		int		false	"Items per page (max 100)"	minimum(1)	maximum(100)
-//	@Param			order_id	query		string	false	"Filter by order UUID"
-//	@Param			product_id	query		string	false	"Filter by product UUID"
+//	@Param			order_id	query		string	false	"Filter by order id (opaque token)"
+//	@Param			product_id	query		string	false	"Filter by product id (opaque token)"
 //	@Success		200			{object}	PaginatedResponse
 //	@Failure		400			{object}	ErrorResponse
 //	@Failure		500			{object}	ErrorResponse

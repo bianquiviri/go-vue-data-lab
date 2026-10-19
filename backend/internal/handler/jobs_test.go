@@ -62,20 +62,22 @@ func newFakeJobControl(t *testing.T) *fakeJobControl {
 func (f *fakeJobControl) Start(ctx context.Context, jobType string, params any) (uuid.UUID, error) {
 	return f.start(ctx, jobType, params)
 }
-func (f *fakeJobControl) Stop() error                       { return f.stop() }
-func (f *fakeJobControl) Status() (jobs.JobStatus, error)   { return f.status() }
-func (f *fakeJobControl) Progress() (jobs.Progress, error)  { return f.progress() }
+func (f *fakeJobControl) Stop() error                      { return f.stop() }
+func (f *fakeJobControl) Status() (jobs.JobStatus, error)  { return f.status() }
+func (f *fakeJobControl) Progress() (jobs.Progress, error) { return f.progress() }
 func (f *fakeJobControl) History(ctx context.Context, page, perPage int) ([]models.JobExecution, int64, error) {
 	return f.history(ctx, page, perPage)
 }
 
 var _ service.JobControl = (*fakeJobControl)(nil)
 
-// jobsEngine mounts the jobs routes on a fresh engine.
+// jobsEngine mounts the jobs routes on a fresh engine with the opaque id
+// codec wired, so job ids are sealed in responses.
 func jobsEngine(svc service.JobControl) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	h := handler.NewJobsHandler(svc)
 	engine := gin.New()
+	engine.Use(handler.WithCodec(testCodec))
 	engine.POST("/api/v1/jobs/generate/start", h.StartGenerate)
 	engine.POST("/api/v1/jobs/migrate/start", h.StartMigrate)
 	engine.POST("/api/v1/jobs/stop", h.Stop)
@@ -126,7 +128,7 @@ func TestJobsStartGenerateAccepted(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if body.Data.JobID != id.String() || body.Data.Type != jobs.TypeGenerate {
+	if body.Data.JobID != sealID(id) || body.Data.Type != jobs.TypeGenerate {
 		t.Errorf("unexpected body: %+v", body.Data)
 	}
 }
@@ -248,12 +250,16 @@ func TestJobsStatus(t *testing.T) {
 		t.Fatalf("expected %d, got %d", http.StatusOK, rec.Code)
 	}
 	var body struct {
-		Data jobs.JobStatus `json:"data"`
+		Data struct {
+			ID      string `json:"id"`
+			Status  string `json:"status"`
+			Running bool   `json:"running"`
+		} `json:"data"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if body.Data.Status != jobs.StatusRunning || !body.Data.Running {
+	if body.Data.Status != string(jobs.StatusRunning) || !body.Data.Running {
 		t.Errorf("unexpected status: %+v", body.Data)
 	}
 }
@@ -268,13 +274,21 @@ func TestJobsProgress(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected %d, got %d", http.StatusOK, rec.Code)
 	}
+	// job_id is a sealed token, so decode the envelope loosely.
 	var body struct {
-		Data jobs.Progress `json:"data"`
+		Data struct {
+			JobID    string  `json:"job_id"`
+			Percent  float64 `json:"percent"`
+			Entities []struct {
+				Entity string `json:"entity"`
+				Done   int64  `json:"done"`
+			} `json:"entities"`
+		} `json:"data"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if body.Data.Percent != 42 || len(body.Data.Entities) != 1 {
+	if body.Data.Percent != 42 || len(body.Data.Entities) != 1 || body.Data.JobID == "" {
 		t.Errorf("unexpected progress: %+v", body.Data)
 	}
 }
@@ -295,7 +309,11 @@ func TestJobsHistoryPaginated(t *testing.T) {
 		t.Errorf("expected page=2 per_page=5, got %d/%d", gotPage, gotPerPage)
 	}
 	var body struct {
-		Data []models.JobExecution `json:"data"`
+		Data []struct {
+			ID      string `json:"id"`
+			JobName string `json:"job_name"`
+			Status  string `json:"status"`
+		} `json:"data"`
 		Meta struct {
 			Page       int   `json:"page"`
 			PerPage    int   `json:"per_page"`
@@ -306,7 +324,7 @@ func TestJobsHistoryPaginated(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if len(body.Data) != 1 || body.Meta.Total != 42 || body.Meta.TotalPages != 9 {
+	if len(body.Data) != 1 || body.Data[0].JobName != "generate" || body.Meta.Total != 42 || body.Meta.TotalPages != 9 {
 		t.Errorf("unexpected history envelope: %+v", body)
 	}
 }
