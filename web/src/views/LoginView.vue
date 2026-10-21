@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { Loader2 } from 'lucide-vue-next'
 
 import { Button } from '@/components/ui/button'
 import AppFooter from '@/components/AppFooter.vue'
+import LanguageToggle from '@/components/LanguageToggle.vue'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 import {
   Card,
@@ -20,6 +22,7 @@ import { useAuthStore } from '@/stores/auth'
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
+const { t } = useI18n()
 
 const email = ref('')
 const password = ref('')
@@ -28,12 +31,14 @@ const submitted = ref(false)
 
 const emailError = computed(() => {
   const value = email.value.trim()
-  if (!value) return 'El email es obligatorio'
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'El formato del email no es válido'
+  if (!value) return t('auth.emailRequired')
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return t('auth.emailInvalid')
   return ''
 })
 
-const passwordError = computed(() => (password.value ? '' : 'La contraseña es obligatoria'))
+const passwordError = computed(() =>
+  password.value ? '' : t('auth.passwordRequired'),
+)
 
 const formError = computed(() => (submitted.value ? emailError.value || passwordError.value : ''))
 
@@ -58,21 +63,22 @@ async function onSubmit(): Promise<void> {
 
 <template>
   <div class="bg-background flex min-h-screen flex-col">
-    <!-- Toggle de tema también en el login (esquina superior derecha) -->
-    <header class="flex items-center justify-end p-4">
+    <!-- Selectores de idioma y tema también en el login (esquina superior derecha) -->
+    <header class="flex items-center justify-end gap-2 p-4">
+      <LanguageToggle />
       <ThemeToggle />
     </header>
 
     <main class="flex flex-1 items-center justify-center p-4">
       <Card class="w-full max-w-sm">
       <CardHeader>
-        <CardTitle class="text-xl">Iniciar sesión</CardTitle>
-        <CardDescription>Acceso al Go Concurrent Data Processing Lab</CardDescription>
+        <CardTitle class="text-xl">{{ t('auth.title') }}</CardTitle>
+        <CardDescription>{{ t('auth.subtitle') }}</CardDescription>
       </CardHeader>
       <CardContent>
         <form class="grid gap-4" novalidate @submit.prevent="onSubmit">
           <div class="grid gap-2">
-            <Label for="email">Email</Label>
+            <Label for="email">{{ t('auth.email') }}</Label>
             <Input
               id="email"
               v-model="email"
@@ -89,7 +95,7 @@ async function onSubmit(): Promise<void> {
           </div>
 
           <div class="grid gap-2">
-            <Label for="password">Contraseña</Label>
+            <Label for="password">{{ t('auth.password') }}</Label>
             <Input
               id="password"
               v-model="password"
@@ -123,7 +129,7 @@ async function onSubmit(): Promise<void> {
 
           <Button type="submit" class="w-full" :disabled="auth.loading">
             <Loader2 v-if="auth.loading" class="animate-spin" />
-            {{ auth.loading ? 'Entrando…' : 'Entrar' }}
+            {{ auth.loading ? t('auth.submitting') : t('auth.submit') }}
           </Button>
         </form>
       </CardContent>

@@ -4,6 +4,22 @@ Memoria viva del proyecto. Se carga en cada sesión de opencode.
 Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo.
 
 ## Estado actual
+- ✅ **i18n ES/EN con `vue-i18n` @ WIP (21-oct)**: doble idioma real. `web/src/i18n/`
+  (`index.ts` con `createI18n({legacy:false})`, `detectLocale()` = `gdl.locale` → `navigator.language`
+  (`es*` ⇒ es) → default **`en`**; `fallbackLocale: 'en'`, `SUPPORTED_LOCALES`),
+  `i18n/locales/{en,es}.ts` (**EN es la fuente de verdad**: `MessageSchema = typeof en` tipa `es`
+  ⇒ TS detecta claves faltantes/sobrantes), `stores/locale.ts` (patrón de `stores/theme.ts`:
+  `init`/`setLocale`/`apply`; escribe `i18n.global.locale` + `<html lang>`), `components/LanguageToggle.vue`
+  (grupo ES/EN con `aria-pressed`). Toggle en las **3 superficies** junto al `ThemeToggle`.
+  Anti-flash de idioma en `index.html`. **Diseño**: `nav.ts` y `router` guardan **claves**
+  (`titleKey`/`descriptionKey`, `meta.titleKey`) y los consumidores resuelven con `t()` ⇒ reactivo
+  al cambio de idioma sin re-montar; `route.meta.title` literal eliminado. **No se traducen**:
+  nombre del autor y código `CC BY-NC-ND 4.0`; `data-test` intactos. Tests: `setup.ts` registra
+  i18n globalmente + resetea locale en `afterEach`, helper `useLocale()` en fixtures para idioma
+  determinista. Verificado (subagente `frontend-vue` + revisión del orquestador):
+  **158 tests** (17 archivos), cobertura **98.62% stmts / 95.52% branches**, `type-check`/`lint`/`build` ✅;
+  E2E propio con vitest: detección, persistencia tras reload, cambio inmediato de textos
+  (`auth.title`/`layout.logout` ES↔EN), `<html lang>`, y paridad de claves ES=EN (112=112).
 - ✅ **Footer CC + toggle de tema en todas las vistas @ WIP (21-oct)**: componentes compartidos
   `components/AppFooter.vue` (proyecto + **"Developed by Jose Antonio Bianco"** + licencia
   **CC BY-NC-ND 4.0** — la más restrictiva de Creative Commons, enlace con `rel="noopener"`)
@@ -302,13 +318,16 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
   opacos y hay que **pasarlos tal cual** de vuelta en paths/filtros/bodies (no reinterpretarlos).
 - ✅ **Push autorizado por el usuario (21-oct)**: subidos al **PR #40** los bloques WIP
   (landing siempre visible, Issue #38 paleta azul, footer CC + ThemeToggle). `gh release`
-  sigue denegado.
-- **Decisión abierta (Issue #37)**: el usuario pide **cambiar todo el texto a inglés *o*
-  hacer doble idioma**. Pendiente de confirmar alcance: (a) inglés hardcodeado completo —
-  la landing/footer ya están en inglés, queda `LoginView`, `AppLayout`, `nav.ts`, `router`,
-  `PlaceholderView`, `index.html lang` — o (b) i18n con selector ES/EN (i18n library +
-  locale files + persistencia; mucho más alcance). Recomendación del orquestador: (a),
-  coherente con la decisión ya anotada.
+  sigue denegado. **Ojo**: el PR #40 ya había sido **mergeado** (`ec11a7e`), así que la rama
+  siguió creciendo post-merge ⇒ se abrió el **PR #41** (`feature/jobs-scheduler-api` → `main`)
+  con los 10 commits acumulados (secureid T2, lint, #38, #39, landing, footer/toggle).
+- ✅ **Issue #37 (i18n) RESUELTO @ WIP (21-oct)**: el usuario eligió **doble idioma ES/EN**
+  (no inglés hardcodeado) y delegó la ejecución en `frontend-vue`. Implementado con
+  `vue-i18n@11.4.16`: infra `i18n/` + `stores/locale.ts` + `LanguageToggle.vue` en las 3
+  superficies; todas las cadenas de UI pasan por `t()` (vistas, layout, nav, router meta,
+  footer, toggles). Fuera de alcance por decisión: `document.title` dinámico, i18n de
+  fechas/números, mensajes de error del backend.
+- **Sin commitear**: bloque i18n (24 modificados + 4 creados + 2 specs nuevos en `web/`).
 - **Rama**: todo el trabajo sigue en `feature/jobs-scheduler-api` (misma rama del PR #40,
   decisión del orquestador: no se puede ramificar de `main` porque el frontend solo existe aquí).
 - Luego Issues #20-#24: tablas CRUD, jobs/scheduler, admin logs, analytics.

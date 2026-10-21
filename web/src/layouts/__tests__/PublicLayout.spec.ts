@@ -5,7 +5,7 @@ import { RouterView, createMemoryHistory, createRouter } from 'vue-router'
 
 import PublicLayout from '../PublicLayout.vue'
 import { useAuthStore } from '@/stores/auth'
-import { makeUser } from '@/__tests__/fixtures'
+import { makeUser, useLocale } from '@/__tests__/fixtures'
 
 /**
  * Monta la ruta pública (`/` ⇒ PublicLayout + hijo) dentro de un router
@@ -52,6 +52,8 @@ async function mountPublicLayout({ authenticated = false } = {}) {
 describe('layouts/PublicLayout', () => {
   beforeEach(() => {
     localStorage.clear()
+    // Inglés determinista para las cadenas del CTA.
+    useLocale('en')
   })
 
   it('muestra el nombre del proyecto en el header', async () => {
@@ -87,6 +89,23 @@ describe('layouts/PublicLayout', () => {
     expect(wrapper.find('[data-test="theme-light"]').exists()).toBe(true)
     expect(wrapper.find('[data-test="theme-dark"]').exists()).toBe(true)
     expect(wrapper.find('[data-test="theme-system"]').exists()).toBe(true)
+  })
+
+  it('ofrece el selector de idioma ES/EN en el header público', async () => {
+    const { wrapper } = await mountPublicLayout()
+    expect(wrapper.find('[data-test="language-toggle"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="locale-es"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="locale-en"]').exists()).toBe(true)
+  })
+
+  it('cambiar a ES traduce el CTA y el footer al instante', async () => {
+    const { wrapper } = await mountPublicLayout()
+    expect(wrapper.get('[data-test="public-cta"]').text()).toContain('Sign in')
+
+    await wrapper.get('[data-test="locale-es"]').trigger('click')
+
+    expect(wrapper.get('[data-test="public-cta"]').text()).toContain('Iniciar sesión')
+    expect(wrapper.get('[data-test="footer-project"]').text()).toContain('plataforma sintética')
   })
 
   it('renderiza el contenido de la ruta hija', async () => {

@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink, RouterView } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 
 import { Button } from '@/components/ui/button'
 import AppFooter from '@/components/AppFooter.vue'
+import LanguageToggle from '@/components/LanguageToggle.vue'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 import { useAuthStore } from '@/stores/auth'
 
@@ -17,23 +19,25 @@ import { useAuthStore } from '@/stores/auth'
  * por lo que `isAuthenticated` es estable en el primer render.
  */
 const auth = useAuthStore()
+const { t } = useI18n()
 
 const cta = computed(() =>
   auth.isAuthenticated
-    ? { label: 'Go to dashboard', to: '/dashboard' }
-    : { label: 'Sign in', to: '/login' },
+    ? { label: t('publicHeader.goToDashboard'), to: '/dashboard' }
+    : { label: t('publicHeader.signIn'), to: '/login' },
 )
 </script>
 
 <template>
   <div class="bg-background text-foreground flex min-h-screen flex-col">
-    <!-- Header mínimo: marca + acceso -->
+    <!-- Header mínimo: marca + accesos -->
     <header class="border-b">
       <div class="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-4">
         <RouterLink to="/" class="tracking-tight font-semibold" data-test="public-brand">
-          Go Data Lab
+          {{ t('common.brand') }}
         </RouterLink>
         <div class="flex items-center gap-2">
+          <LanguageToggle />
           <ThemeToggle />
           <Button as-child size="sm" data-test="public-cta">
             <RouterLink :to="cta.to">{{ cta.label }}</RouterLink>

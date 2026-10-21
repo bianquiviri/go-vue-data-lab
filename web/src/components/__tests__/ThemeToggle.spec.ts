@@ -4,12 +4,14 @@ import { mount } from '@vue/test-utils'
 
 import ThemeToggle from '../ThemeToggle.vue'
 import { THEME_STORAGE_KEY, useThemeStore } from '@/stores/theme'
+import { useLocale } from '@/__tests__/fixtures'
 
 describe('components/ThemeToggle', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     localStorage.clear()
     document.documentElement.classList.remove('dark')
+    useLocale('en')
   })
 
   it('renderiza los tres modos: Claro, Oscuro y Sistema', () => {
@@ -19,10 +21,22 @@ describe('components/ThemeToggle', () => {
     expect(wrapper.find('[data-test="theme-system"]').exists()).toBe(true)
   })
 
-  it('el grupo es accesible (role=group con aria-label)', () => {
+  it('el grupo es accesible (role=group con aria-label traducido)', () => {
     const wrapper = mount(ThemeToggle)
     const group = wrapper.get('[role="group"]')
-    expect(group.attributes('aria-label')).toBe('Tema')
+    expect(group.attributes('aria-label')).toBe('Theme')
+  })
+
+  it('traduce las etiquetas del grupo y de los botones al cambiar de idioma', async () => {
+    const wrapper = mount(ThemeToggle)
+
+    useLocale('es')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('[role="group"]').attributes('aria-label')).toBe('Tema')
+    expect(wrapper.get('[data-test="theme-light"]').text()).toBe('Claro')
+    expect(wrapper.get('[data-test="theme-dark"]').text()).toBe('Oscuro')
+    expect(wrapper.get('[data-test="theme-system"]').text()).toBe('Sistema')
   })
 
   it('cambia a Oscuro: actualiza el store, <html> y localStorage', async () => {

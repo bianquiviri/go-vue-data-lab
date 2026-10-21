@@ -5,7 +5,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 
 import LandingView from '../LandingView.vue'
 import { useAuthStore } from '@/stores/auth'
-import { makeUser } from '@/__tests__/fixtures'
+import { makeUser, useLocale } from '@/__tests__/fixtures'
 
 /**
  * Monta la landing con un router mínimo (no depende de los guards reales) y un
@@ -40,6 +40,9 @@ async function mountLanding({ authenticated = false } = {}) {
 describe('views/LandingView', () => {
   beforeEach(() => {
     localStorage.clear()
+    // Inglés determinista: la landing es la vista que estaba en inglés y sus
+    // aserciones se escribieron contra ese idioma.
+    useLocale('en')
   })
 
   it('muestra el nombre del proyecto y su tagline', async () => {
@@ -128,11 +131,28 @@ describe('views/LandingView', () => {
     expect(text.toLowerCase()).toContain('opaque')
   })
 
-  it('el copy de la landing está en inglés', async () => {
+  it('el copy de la landing cambia de idioma de forma reactiva (EN → ES)', async () => {
     const { wrapper } = await mountLanding()
-    const text = wrapper.text()
-    expect(text).not.toContain('Iniciar sesión')
-    expect(text).not.toContain('Bienvenido')
-    expect(text).toContain('Sign in')
+    expect(wrapper.text()).toContain('Sign in')
+    expect(wrapper.get('[data-test="what-is-this-title"]').text()).toBe('What is this?')
+
+    useLocale('es')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.text()).toContain('Iniciar sesión')
+    expect(wrapper.text()).not.toContain('Sign in')
+    expect(wrapper.get('[data-test="what-is-this-title"]').text()).toBe('¿Qué es esto?')
+    expect(wrapper.text()).toContain('clientes, productos, órdenes e items')
+    // La estructura (claves/schema) se mantiene estable entre idiomas.
+    expect(wrapper.text()).toContain('lab_source')
+    expect(wrapper.text()).toContain('lab_target')
+  })
+
+  it('en español el CTA sin sesión invita a iniciar sesión', async () => {
+    useLocale('es')
+    const { wrapper } = await mountLanding()
+    const cta = wrapper.get('[data-test="landing-cta"]')
+    expect(cta.text()).toContain('Iniciar sesión')
+    expect(cta.attributes('href')).toBe('/login')
   })
 })

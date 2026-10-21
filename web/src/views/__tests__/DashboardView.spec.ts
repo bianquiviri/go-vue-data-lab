@@ -5,7 +5,7 @@ import { mount } from '@vue/test-utils'
 import DashboardView from '../DashboardView.vue'
 import { createAppRouter } from '@/router'
 import { useAuthStore } from '@/stores/auth'
-import { makeUser } from '@/__tests__/fixtures'
+import { makeUser, useLocale } from '@/__tests__/fixtures'
 
 async function mountDashboard(role: 'admin' | 'viewer' = 'admin') {
   const auth = useAuthStore()
@@ -27,12 +27,25 @@ describe('views/DashboardView', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     localStorage.clear()
+    // Español determinista para el saludo y las descripciones de las tarjetas.
+    useLocale('es')
   })
 
   it('muestra el saludo con el email del usuario', async () => {
     const { wrapper } = await mountDashboard()
     expect(wrapper.text()).toContain('Dashboard')
     expect(wrapper.text()).toContain('root')
+    expect(wrapper.text()).toContain('Hola, root')
+  })
+
+  it('en inglés traduce el saludo y las tarjetas de forma reactiva', async () => {
+    const { wrapper } = await mountDashboard()
+
+    useLocale('en')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.text()).toContain('Hi, root')
+    expect(wrapper.text()).toContain('Customer catalog (lab_source)')
   })
 
   it('renderiza una tarjeta por sección visible y enlaza a cada una', async () => {

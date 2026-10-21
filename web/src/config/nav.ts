@@ -12,13 +12,18 @@ import {
 
 import type { UserRole } from '@/types/auth'
 
+/**
+ * Item de navegación. `titleKey`/`descriptionKey` son claves i18n (no texto):
+ * así `nav.ts` es datos puros sin depender de la instancia de vue-i18n y los
+ * consumidores resuelven con `t()` en tiempo de render (reactivo al idioma).
+ */
 export interface NavItem {
-  title: string
+  titleKey: string
   /** Nombre de la ruta (usado por el router y los links activos). */
   routeName: string
   to: string
   icon: LucideIcon
-  description: string
+  descriptionKey: string
   /** Roles que pueden ver el item; vacío = todos los roles autenticados. */
   roles?: UserRole[]
 }
@@ -29,60 +34,60 @@ export interface NavItem {
  */
 export const NAV_ITEMS: NavItem[] = [
   {
-    title: 'Dashboard',
+    titleKey: 'nav.dashboard.title',
     routeName: 'dashboard',
     to: '/dashboard',
     icon: LayoutDashboard,
-    description: 'Resumen general del laboratorio',
+    descriptionKey: 'nav.dashboard.description',
   },
   {
-    title: 'Customers',
+    titleKey: 'nav.customers.title',
     routeName: 'customers',
     to: '/customers',
     icon: Users,
-    description: 'Catálogo de clientes (lab_source)',
+    descriptionKey: 'nav.customers.description',
   },
   {
-    title: 'Products',
+    titleKey: 'nav.products.title',
     routeName: 'products',
     to: '/products',
     icon: Package,
-    description: 'Catálogo de productos (lab_source)',
+    descriptionKey: 'nav.products.description',
   },
   {
-    title: 'Orders',
+    titleKey: 'nav.orders.title',
     routeName: 'orders',
     to: '/orders',
     icon: ShoppingCart,
-    description: 'Órdenes e items (lab_source)',
+    descriptionKey: 'nav.orders.description',
   },
   {
-    title: 'Target / Analytics',
+    titleKey: 'nav.target.title',
     routeName: 'target',
     to: '/target',
     icon: BarChart3,
-    description: 'Datos procesados y analítica (lab_target)',
+    descriptionKey: 'nav.target.description',
   },
   {
-    title: 'Jobs',
+    titleKey: 'nav.jobs.title',
     routeName: 'jobs',
     to: '/jobs',
     icon: Cpu,
-    description: 'Control y progreso de jobs en tiempo real',
+    descriptionKey: 'nav.jobs.description',
   },
   {
-    title: 'Scheduler',
+    titleKey: 'nav.scheduler.title',
     routeName: 'scheduler',
     to: '/scheduler',
     icon: CalendarClock,
-    description: 'Programación de tareas cron',
+    descriptionKey: 'nav.scheduler.description',
   },
   {
-    title: 'Admin logs',
+    titleKey: 'nav.adminLogs.title',
     routeName: 'admin-logs',
     to: '/admin/logs',
     icon: ShieldAlert,
-    description: 'Logs de error del backend (solo admin)',
+    descriptionKey: 'nav.adminLogs.description',
     roles: ['admin'],
   },
 ]

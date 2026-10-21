@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import {
   CalendarClock,
   Check,
@@ -21,111 +22,108 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useAuthStore } from '@/stores/auth'
 
 /**
- * Landing pública (Issue #39). Copy en inglés por decisión: el Issue #37
- * migrará el resto de la UI; esta vista se escribe en inglés desde ya.
- * Todo el contenido es estático salvo el CTA, que depende de si hay sesión.
+ * Landing pública (Issue #39) con doble idioma ES/EN. Todo el copy vive en
+ * `i18n/locales/*` bajo `landing.*`; aquí solo quedan las claves y los iconos.
  *
  * La vista se renderiza SIEMPRE en `/` (con o sin sesión): el guard del router
  * ya espera a `auth.initialize()` antes de montarla, así que `isAuthenticated`
  * es estable en el primer render y no hay parpadeo.
  */
 const auth = useAuthStore()
+const { t } = useI18n()
 
 const cta = computed(() =>
   auth.isAuthenticated
-    ? { label: 'Go to dashboard', to: '/dashboard' }
-    : { label: 'Sign in', to: '/login' },
+    ? { label: t('publicHeader.goToDashboard'), to: '/dashboard' }
+    : { label: t('publicHeader.signIn'), to: '/login' },
 )
 
 interface Feature {
-  title: string
-  description: string
+  titleKey: string
+  descriptionKey: string
   icon: LucideIcon
 }
 
 const FEATURES: Feature[] = [
   {
-    title: 'Concurrent worker pool',
-    description: 'Goroutine worker pools with panic recovery, live metrics and batched job control.',
+    titleKey: 'landing.features.workerPoolTitle',
+    descriptionKey: 'landing.features.workerPoolDetail',
     icon: Cpu,
   },
   {
-    title: 'Cron scheduler',
-    description: 'Schedules persisted in PostgreSQL and executed with robfig/cron.',
+    titleKey: 'landing.features.schedulerTitle',
+    descriptionKey: 'landing.features.schedulerDetail',
     icon: CalendarClock,
   },
   {
-    title: 'Resumable ETL',
-    description: 'Checkpoint-based, idempotent migration between the source and target schemas.',
+    titleKey: 'landing.features.etlTitle',
+    descriptionKey: 'landing.features.etlDetail',
     icon: RefreshCcw,
   },
   {
-    title: 'Role-based access control',
-    description: 'RBAC roles — admin, operator and viewer — guarding every read and write endpoint.',
+    titleKey: 'landing.features.rbacTitle',
+    descriptionKey: 'landing.features.rbacDetail',
     icon: ShieldCheck,
   },
   {
-    title: 'REST API + Swagger',
-    description: 'A documented OpenAPI surface under /api/v1 with stable envelopes.',
+    titleKey: 'landing.features.apiTitle',
+    descriptionKey: 'landing.features.apiDetail',
     icon: FileCode2,
   },
   {
-    title: 'Encrypted opaque IDs',
-    description: 'AES-256-GCM tokens keep internal database identifiers out of every response.',
+    titleKey: 'landing.features.opaqueIdsTitle',
+    descriptionKey: 'landing.features.opaqueIdsDetail',
     icon: KeyRound,
   },
 ]
 
 interface PipelineStep {
-  title: string
+  titleKey: string
   /** Esquema (o concepto) al que corresponde el paso, renderizado como chip mono. */
   schema: string
-  detail: string
+  detailKey: string
   icon: LucideIcon
 }
 
 /** Los tres tramos del pipeline: ingesta → transformación → analítica. */
 const PIPELINE: PipelineStep[] = [
   {
-    title: 'Ingest',
+    titleKey: 'landing.pipeline.ingestTitle',
     schema: 'lab_source',
-    detail: 'Raw schema. Generated records land here untouched — the ground truth for every run.',
+    detailKey: 'landing.pipeline.ingestDetail',
     icon: Database,
   },
   {
-    title: 'Transform',
+    titleKey: 'landing.pipeline.transformTitle',
     schema: 'resumable ETL',
-    detail:
-      'Checkpoint-based, idempotent migration in batches with panic recovery. Interrupted runs resume from their last checkpoint.',
+    detailKey: 'landing.pipeline.transformDetail',
     icon: Workflow,
   },
   {
-    title: 'Serve',
+    titleKey: 'landing.pipeline.serveTitle',
     schema: 'lab_target',
-    detail: 'Processed records plus the aggregates that feed real-time analytics.',
+    detailKey: 'landing.pipeline.serveDetail',
     icon: LineChart,
   },
 ]
 
 interface Capability {
-  title: string
-  detail: string
+  titleKey: string
+  detailKey: string
 }
 
 const CAPABILITIES: Capability[] = [
   {
-    title: 'Run massive simulations',
-    detail:
-      'Worker pools process batches of 3,000–4,000 records concurrently and report progress as they go.',
+    titleKey: 'landing.capabilities.simulateTitle',
+    detailKey: 'landing.capabilities.simulateDetail',
   },
   {
-    title: 'Schedule recurring work',
-    detail: 'Cron definitions are persisted in PostgreSQL and executed by robfig/cron.',
+    titleKey: 'landing.capabilities.scheduleTitle',
+    detailKey: 'landing.capabilities.scheduleDetail',
   },
   {
-    title: 'Explore the results',
-    detail:
-      'A REST API under /api/v1, documented in Swagger and guarded by RBAC roles (admin, operator, viewer).',
+    titleKey: 'landing.capabilities.exploreTitle',
+    detailKey: 'landing.capabilities.exploreDetail',
   },
 ]
 </script>
@@ -138,15 +136,13 @@ const CAPABILITIES: Capability[] = [
         class="text-4xl font-semibold tracking-tight sm:text-5xl"
         data-test="landing-title"
       >
-        Go Data Lab
+        {{ t('common.brand') }}
       </h1>
       <p class="text-muted-foreground text-lg">
-        Go Concurrent Data Processing Lab
+        {{ t('landing.tagline') }}
       </p>
       <p class="text-muted-foreground mx-auto max-w-xl">
-        Concurrent data processing, massive simulation and real-time analytics over a synthetic
-        e-commerce dataset — customers, products, orders and order items, from ingestion to
-        insight.
+        {{ t('landing.hero') }}
       </p>
       <Button as-child size="lg" data-test="landing-cta">
         <RouterLink :to="cta.to">{{ cta.label }}</RouterLink>
@@ -157,38 +153,33 @@ const CAPABILITIES: Capability[] = [
     <section class="space-y-10" aria-labelledby="what-is-this-title" data-test="what-is-this">
       <div class="mx-auto max-w-2xl space-y-4 text-center">
         <p class="text-muted-foreground text-xs font-medium tracking-widest uppercase">
-          Overview
+          {{ t('landing.overview') }}
         </p>
         <h2
           id="what-is-this-title"
           class="text-2xl font-semibold tracking-tight sm:text-3xl"
           data-test="what-is-this-title"
         >
-          What is this?
+          {{ t('landing.whatIsThisTitle') }}
         </h2>
         <p class="text-muted-foreground">
-          Go Data Lab is a laboratory for exploring concurrent data processing in Go over a
-          synthetic e-commerce model — customers, products, orders and order items. Every dataset
-          is generated on demand inside a real PostgreSQL database, at whatever volume the
-          experiment requires.
+          {{ t('landing.whatIsThisP1') }}
         </p>
         <p class="text-muted-foreground">
-          Its purpose is to simulate massive volumes while keeping the whole pipeline visible,
-          from ingestion to analytics, so concurrency strategies, batching and resumability can be
-          measured end to end on data you control.
+          {{ t('landing.whatIsThisP2') }}
         </p>
       </div>
 
       <!-- Pipeline: lab_source → ETL con checkpoints → lab_target -->
       <div class="space-y-4">
         <div class="space-y-1 text-center">
-          <h3 class="text-lg font-medium tracking-tight">How the pipeline works</h3>
+          <h3 class="text-lg font-medium tracking-tight">{{ t('landing.pipelineTitle') }}</h3>
           <p class="text-muted-foreground text-sm">
-            Two independent PostgreSQL schemas, so a failed run never touches the source data.
+            {{ t('landing.pipelineSubtitle') }}
           </p>
         </div>
         <ol class="grid gap-4 md:grid-cols-3" data-test="pipeline-step-list">
-          <li v-for="(step, index) in PIPELINE" :key="step.title">
+          <li v-for="(step, index) in PIPELINE" :key="step.titleKey">
             <Card class="h-full" data-test="pipeline-step">
               <CardHeader class="pb-2">
                 <div class="flex items-center gap-2">
@@ -196,7 +187,7 @@ const CAPABILITIES: Capability[] = [
                     {{ index + 1 }}
                   </Badge>
                   <component :is="step.icon" class="text-primary size-4" aria-hidden="true" />
-                  <CardTitle class="text-base">{{ step.title }}</CardTitle>
+                  <CardTitle class="text-base">{{ t(step.titleKey) }}</CardTitle>
                 </div>
               </CardHeader>
               <CardContent class="space-y-2">
@@ -205,7 +196,7 @@ const CAPABILITIES: Capability[] = [
                 >
                   {{ step.schema }}
                 </code>
-                <CardDescription>{{ step.detail }}</CardDescription>
+                <CardDescription>{{ t(step.detailKey) }}</CardDescription>
               </CardContent>
             </Card>
           </li>
@@ -215,17 +206,17 @@ const CAPABILITIES: Capability[] = [
       <!-- Usos -->
       <Card data-test="capabilities">
         <CardHeader>
-          <CardTitle class="text-lg">What can you do with it?</CardTitle>
-          <CardDescription>Three entry points into the lab.</CardDescription>
+          <CardTitle class="text-lg">{{ t('landing.capabilitiesTitle') }}</CardTitle>
+          <CardDescription>{{ t('landing.capabilitiesSubtitle') }}</CardDescription>
         </CardHeader>
         <CardContent>
           <ul class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            <li v-for="capability in CAPABILITIES" :key="capability.title" class="space-y-1.5">
+            <li v-for="capability in CAPABILITIES" :key="capability.titleKey" class="space-y-1.5">
               <p class="flex items-center gap-2 text-sm font-medium">
                 <Check class="text-primary size-4 shrink-0" aria-hidden="true" />
-                {{ capability.title }}
+                {{ t(capability.titleKey) }}
               </p>
-              <p class="text-muted-foreground text-sm">{{ capability.detail }}</p>
+              <p class="text-muted-foreground text-sm">{{ t(capability.detailKey) }}</p>
             </li>
           </ul>
         </CardContent>
@@ -233,17 +224,17 @@ const CAPABILITIES: Capability[] = [
     </section>
 
     <!-- Features -->
-    <section aria-label="Features">
+    <section :aria-label="t('landing.featuresAriaLabel')">
       <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Card v-for="feature in FEATURES" :key="feature.title" data-test="feature">
+        <Card v-for="feature in FEATURES" :key="feature.titleKey" data-test="feature">
           <CardHeader class="pb-2">
             <div class="flex items-center gap-2">
               <component :is="feature.icon" class="text-primary size-5" />
-              <CardTitle class="text-base">{{ feature.title }}</CardTitle>
+              <CardTitle class="text-base">{{ t(feature.titleKey) }}</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
-            <CardDescription>{{ feature.description }}</CardDescription>
+            <CardDescription>{{ t(feature.descriptionKey) }}</CardDescription>
           </CardContent>
         </Card>
       </div>

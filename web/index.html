@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
   <head>
     <meta charset="UTF-8">
     <link rel="icon" href="/favicon.ico">
@@ -25,6 +25,25 @@
           document.documentElement.style.colorScheme = mode
         } catch (e) {
           // localStorage no disponible: se queda en el tema claro por defecto
+        }
+      })()
+    </script>
+    <script>
+      // Anti-flash de idioma: fija <html lang> antes del primer paint con la
+      // misma clave y la misma detección que i18n/index.ts (gdl.locale).
+      (function () {
+        try {
+          var stored = window.localStorage.getItem('gdl.locale')
+          var locale = null
+          if (stored === 'es' || stored === 'en') {
+            locale = stored
+          } else {
+            var language = (navigator.language || '').toLowerCase()
+            locale = language.indexOf('es') === 0 ? 'es' : 'en'
+          }
+          document.documentElement.lang = locale
+        } catch (e) {
+          // localStorage no disponible: se queda con el lang por defecto (en)
         }
       })()
     </script>

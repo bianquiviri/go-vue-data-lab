@@ -16,7 +16,8 @@ export const APP_ROUTES: RouteRecordRaw[] = [
         path: '',
         name: 'landing',
         component: () => import('@/views/LandingView.vue'),
-        meta: { public: true, title: 'Go Data Lab — Concurrent Data Processing' },
+        // `titleKey`: clave i18n (no texto) para que el título sea reactivo al idioma.
+        meta: { public: true, titleKey: 'landing.tagline' },
       },
     ],
   },
@@ -24,7 +25,7 @@ export const APP_ROUTES: RouteRecordRaw[] = [
     path: '/login',
     name: 'login',
     component: () => import('@/views/LoginView.vue'),
-    meta: { public: true, title: 'Iniciar sesión' },
+    meta: { public: true, titleKey: 'auth.title' },
   },
   {
     // Panel protegido. El padre vive en `/` para que las secciones placeholder
@@ -39,7 +40,7 @@ export const APP_ROUTES: RouteRecordRaw[] = [
         path: 'dashboard',
         name: 'dashboard',
         component: () => import('@/views/DashboardView.vue'),
-        meta: { title: 'Dashboard' },
+        meta: { titleKey: 'nav.dashboard.title' },
       },
       // Secciones placeholder (Issues #20-#24); reutilizan PlaceholderView.
       // El item Dashboard de NAV_ITEMS NO genera ruta propia: la ruta declarada
@@ -50,8 +51,8 @@ export const APP_ROUTES: RouteRecordRaw[] = [
         name: item.routeName,
         component: () => import('@/views/PlaceholderView.vue'),
         meta: {
-          title: item.title,
-          description: item.description,
+          titleKey: item.titleKey,
+          descriptionKey: item.descriptionKey,
           ...(item.roles ? { roles: item.roles satisfies UserRole[] } : {}),
         },
       })),
