@@ -110,7 +110,7 @@ func (h *SchedulerHandler) Create(c *gin.Context) {
 //	@Tags			scheduler
 //	@Accept			json
 //	@Produce		json
-//	@Param			id		path		string					true	"Schedule UUID"
+//	@Param			id		path		string					true	"Schedule id (opaque token)"
 //	@Param			request	body		scheduler.UpdateParams	true	"Schedule definition"
 //	@Success		200		{object}	ScheduleEnvelope
 //	@Failure		400		{object}	ErrorResponse
@@ -140,7 +140,7 @@ func (h *SchedulerHandler) Update(c *gin.Context) {
 //	@Summary		Delete a cron schedule
 //	@Description	Removes a schedule and unregisters it from the cron runner.
 //	@Tags			scheduler
-//	@Param			id	path	string	true	"Schedule UUID"
+//	@Param			id	path	string	true	"Schedule id (opaque token)"
 //	@Success		204	"No Content"
 //	@Failure		400	{object}	ErrorResponse
 //	@Failure		404	{object}	ErrorResponse
@@ -164,7 +164,7 @@ func (h *SchedulerHandler) Delete(c *gin.Context) {
 //	@Description	Turns a schedule on and registers it with the cron runner.
 //	@Tags			scheduler
 //	@Produce		json
-//	@Param			id	path		string	true	"Schedule UUID"
+//	@Param			id	path		string	true	"Schedule id (opaque token)"
 //	@Success		200	{object}	ScheduleEnvelope
 //	@Failure		400	{object}	ErrorResponse
 //	@Failure		404	{object}	ErrorResponse
@@ -189,7 +189,7 @@ func (h *SchedulerHandler) Enable(c *gin.Context) {
 //	@Description	Turns a schedule off and unregisters it from the cron runner.
 //	@Tags			scheduler
 //	@Produce		json
-//	@Param			id	path		string	true	"Schedule UUID"
+//	@Param			id	path		string	true	"Schedule id (opaque token)"
 //	@Success		200	{object}	ScheduleEnvelope
 //	@Failure		400	{object}	ErrorResponse
 //	@Failure		404	{object}	ErrorResponse
@@ -214,7 +214,7 @@ func (h *SchedulerHandler) Disable(c *gin.Context) {
 //	@Description	Triggers the schedule immediately and returns the started job id.
 //	@Tags			scheduler
 //	@Produce		json
-//	@Param			id	path		string	true	"Schedule UUID"
+//	@Param			id	path		string	true	"Schedule id (opaque token)"
 //	@Success		200	{object}	ScheduleRunEnvelope
 //	@Failure		400	{object}	ErrorResponse
 //	@Failure		404	{object}	ErrorResponse

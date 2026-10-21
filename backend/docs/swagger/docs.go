@@ -417,7 +417,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Schedule UUID",
+                        "description": "Schedule id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -468,7 +468,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Schedule UUID",
+                        "description": "Schedule id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -512,7 +512,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Schedule UUID",
+                        "description": "Schedule id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -559,7 +559,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Schedule UUID",
+                        "description": "Schedule id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -606,7 +606,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Schedule UUID",
+                        "description": "Schedule id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -770,7 +770,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Customer UUID",
+                        "description": "Customer id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -818,7 +818,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Customer UUID",
+                        "description": "Customer id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -875,7 +875,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Customer UUID",
+                        "description": "Customer id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -908,7 +908,7 @@ const docTemplate = `{
         },
         "/source/order-items": {
             "get": {
-                "description": "Paginated order items from lab_source, filterable by order and product.",
+                "description": "Paginated order items from lab_source, filterable by order and product. Each item id (int64) is returned as an opaque token string.",
                 "produces": [
                     "application/json"
                 ],
@@ -934,13 +934,13 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Filter by order UUID",
+                        "description": "Filter by order id (opaque token)",
                         "name": "order_id",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "Filter by product UUID",
+                        "description": "Filter by product id (opaque token)",
                         "name": "product_id",
                         "in": "query"
                     }
@@ -995,7 +995,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Filter by customer UUID",
+                        "description": "Filter by customer id (opaque token)",
                         "name": "customer_id",
                         "in": "query"
                     },
@@ -1040,7 +1040,7 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "Creates an order in lab_source. Items are optional; total_amount is computed from them.",
+                "description": "Creates an order in lab_source. Items are optional; total_amount is computed from them. customer_id and every item product_id are opaque ids (tokens); raw UUIDs are rejected with a 400. The response returns every id (and each item id) as an opaque token string.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1053,12 +1053,12 @@ const docTemplate = `{
                 "summary": "Create a source order",
                 "parameters": [
                     {
-                        "description": "Order payload",
+                        "description": "Order payload (opaque ids)",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/service.OrderCreateInput"
+                            "$ref": "#/definitions/handler.OrderCreateRequest"
                         }
                     }
                 ],
@@ -1092,7 +1092,7 @@ const docTemplate = `{
         },
         "/source/orders/{id}": {
             "get": {
-                "description": "Returns a single order from lab_source by id, including its order items.",
+                "description": "Returns a single order from lab_source by id, including its order items. Every id (and each item id) is returned as an opaque token string.",
                 "produces": [
                     "application/json"
                 ],
@@ -1103,7 +1103,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Order UUID",
+                        "description": "Order id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -1151,7 +1151,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Order UUID",
+                        "description": "Order id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -1202,7 +1202,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Order UUID",
+                        "description": "Order id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -1357,7 +1357,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Product UUID",
+                        "description": "Product id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -1405,7 +1405,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Product UUID",
+                        "description": "Product id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -1462,7 +1462,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Product UUID",
+                        "description": "Product id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -1677,7 +1677,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Customer UUID",
+                        "description": "Customer id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -1739,7 +1739,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Filter by customer UUID",
+                        "description": "Filter by customer id (opaque token)",
                         "name": "customer_id",
                         "in": "query"
                     },
@@ -1786,7 +1786,7 @@ const docTemplate = `{
         },
         "/target/orders/{id}": {
             "get": {
-                "description": "Returns a single order from lab_target by id, including its order items.",
+                "description": "Returns a single order from lab_target by id, including its order items. Every id (and each item id) is returned as an opaque token string.",
                 "produces": [
                     "application/json"
                 ],
@@ -1797,7 +1797,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Order UUID",
+                        "description": "Order id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -1905,7 +1905,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Product UUID",
+                        "description": "Product id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -2052,6 +2052,56 @@ const docTemplate = `{
             "properties": {
                 "limit": {
                     "type": "integer"
+                }
+            }
+        },
+        "handler.OrderCreateRequest": {
+            "type": "object",
+            "required": [
+                "customer_id"
+            ],
+            "properties": {
+                "currency": {
+                    "type": "string"
+                },
+                "customer_id": {
+                    "type": "string"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.OrderItemRequest"
+                    }
+                },
+                "order_date": {
+                    "type": "string"
+                },
+                "order_number": {
+                    "type": "string"
+                },
+                "shipping_address": {
+                    "type": "object"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.OrderItemRequest": {
+            "type": "object",
+            "required": [
+                "product_id"
+            ],
+            "properties": {
+                "product_id": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "integer"
+                },
+                "unit_price": {
+                    "type": "number",
+                    "minimum": 0
                 }
             }
         },
@@ -2549,56 +2599,6 @@ const docTemplate = `{
                 }
             }
         },
-        "service.OrderCreateInput": {
-            "type": "object",
-            "required": [
-                "customer_id"
-            ],
-            "properties": {
-                "currency": {
-                    "type": "string"
-                },
-                "customer_id": {
-                    "type": "string"
-                },
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/service.OrderItemInput"
-                    }
-                },
-                "order_date": {
-                    "type": "string"
-                },
-                "order_number": {
-                    "type": "string"
-                },
-                "shipping_address": {
-                    "type": "object"
-                },
-                "status": {
-                    "type": "string"
-                }
-            }
-        },
-        "service.OrderItemInput": {
-            "type": "object",
-            "required": [
-                "product_id"
-            ],
-            "properties": {
-                "product_id": {
-                    "type": "string"
-                },
-                "quantity": {
-                    "type": "integer"
-                },
-                "unit_price": {
-                    "type": "number",
-                    "minimum": 0
-                }
-            }
-        },
         "service.OrderUpdateInput": {
             "type": "object",
             "properties": {
@@ -2656,7 +2656,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/api/v1",
 	Schemes:          []string{"http", "https"},
 	Title:            "Go Concurrent Data Processing Lab API",
-	Description:      "REST API for the Go Concurrent Data Processing Lab, a concurrent data processing and synthetic e-commerce analytics platform.",
+	Description:      "REST API for the Go Concurrent Data Processing Lab, a concurrent data processing and synthetic e-commerce analytics platform.\nAll `id` and `*_id` values are opaque ids (tokens of the form `v1.<base64url>`): responses seal them and requests must send them back sealed. Raw UUIDs are rejected with 400 validation_failed. The only exception is the numeric `order_items.id`, which is also returned as a token string.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

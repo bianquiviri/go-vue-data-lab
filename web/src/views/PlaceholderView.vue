@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { Construction } from 'lucide-vue-next'
 
 import { Badge } from '@/components/ui/badge'
@@ -9,17 +10,29 @@ import { NAV_ITEMS } from '@/config/nav'
 
 /**
  * Vista genérica para las secciones aún no implementadas (Issues #20-#24).
- * El router la parametriza con `meta.title`/`meta.description` (ver
+ * El router la parametriza con `meta.titleKey`/`meta.descriptionKey` (ver
  * router/index.ts); el icono se resuelve por `route.name` contra NAV_ITEMS.
+ * Las claves se resuelven con `t()` en el computed ⇒ el texto es reactivo al
+ * cambio de idioma sin re-montar la vista.
  */
 const route = useRoute()
+const { t } = useI18n()
 
 const section = computed(() => NAV_ITEMS.find((item) => item.routeName === route.name))
 
-const title = computed(() => (typeof route.meta.title === 'string' ? route.meta.title : section.value?.title ?? 'Sección'))
-const description = computed(
-  () => (typeof route.meta.description === 'string' ? route.meta.description : section.value?.description ?? ''),
+const titleKey = computed(() =>
+  typeof route.meta.titleKey === 'string'
+    ? route.meta.titleKey
+    : (section.value?.titleKey ?? 'placeholder.fallbackTitle'),
 )
+const descriptionKey = computed(() =>
+  typeof route.meta.descriptionKey === 'string'
+    ? route.meta.descriptionKey
+    : (section.value?.descriptionKey ?? ''),
+)
+
+const title = computed(() => t(titleKey.value))
+const description = computed(() => (descriptionKey.value ? t(descriptionKey.value) : ''))
 </script>
 
 <template>
@@ -31,7 +44,7 @@ const description = computed(
           <div>
             <CardTitle class="flex items-center gap-2 text-xl">
               {{ title }}
-              <Badge variant="outline">Próximamente</Badge>
+              <Badge variant="outline">{{ t('placeholder.upcoming') }}</Badge>
             </CardTitle>
             <CardDescription>{{ description }}</CardDescription>
           </div>
@@ -39,9 +52,7 @@ const description = computed(
       </CardHeader>
       <CardContent>
         <p class="text-muted-foreground text-sm">
-          Esta sección está planificada en los Issues #20–#24 (tablas de datos, monitoreo de
-          jobs, scheduler, admin y analítica). Mientras tanto, el resto del panel ya está
-          disponible.
+          {{ t('placeholder.body') }}
         </p>
       </CardContent>
     </Card>

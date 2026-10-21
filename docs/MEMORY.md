@@ -4,6 +4,43 @@ Memoria viva del proyecto. Se carga en cada sesión de opencode.
 Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo.
 
 ## Estado actual
+- ✅ **i18n ES/EN con `vue-i18n` @ WIP (21-oct)**: doble idioma real. `web/src/i18n/`
+  (`index.ts` con `createI18n({legacy:false})`, `detectLocale()` = `gdl.locale` → `navigator.language`
+  (`es*` ⇒ es) → default **`en`**; `fallbackLocale: 'en'`, `SUPPORTED_LOCALES`),
+  `i18n/locales/{en,es}.ts` (**EN es la fuente de verdad**: `MessageSchema = typeof en` tipa `es`
+  ⇒ TS detecta claves faltantes/sobrantes), `stores/locale.ts` (patrón de `stores/theme.ts`:
+  `init`/`setLocale`/`apply`; escribe `i18n.global.locale` + `<html lang>`), `components/LanguageToggle.vue`
+  (grupo ES/EN con `aria-pressed`). Toggle en las **3 superficies** junto al `ThemeToggle`.
+  Anti-flash de idioma en `index.html`. **Diseño**: `nav.ts` y `router` guardan **claves**
+  (`titleKey`/`descriptionKey`, `meta.titleKey`) y los consumidores resuelven con `t()` ⇒ reactivo
+  al cambio de idioma sin re-montar; `route.meta.title` literal eliminado. **No se traducen**:
+  nombre del autor y código `CC BY-NC-ND 4.0`; `data-test` intactos. Tests: `setup.ts` registra
+  i18n globalmente + resetea locale en `afterEach`, helper `useLocale()` en fixtures para idioma
+  determinista. Verificado (subagente `frontend-vue` + revisión del orquestador):
+  **158 tests** (17 archivos), cobertura **98.62% stmts / 95.52% branches**, `type-check`/`lint`/`build` ✅;
+  E2E propio con vitest: detección, persistencia tras reload, cambio inmediato de textos
+  (`auth.title`/`layout.logout` ES↔EN), `<html lang>`, y paridad de claves ES=EN (112=112).
+- ✅ **Footer CC + toggle de tema en todas las vistas @ WIP (21-oct)**: componentes compartidos
+  `components/AppFooter.vue` (proyecto + **"Developed by Jose Antonio Bianco"** + licencia
+  **CC BY-NC-ND 4.0** — la más restrictiva de Creative Commons, enlace con `rel="noopener"`)
+  y `components/ThemeToggle.vue` (Claro/Oscuro/Sistema, extraído del header de AppLayout).
+  Ambos en las **3 superficies**: `PublicLayout` (footer propio reemplazado + toggle en el
+  header junto al CTA), `LoginView` (layout a columna: header con toggle, main centrado,
+  footer al pie) y `AppLayout` (footer tras `<main>`; el bloque de tema inline se eliminó).
+  TDD rojo→verde. Verificado: **123 tests**, cobertura **98.36% stmts / 95.3% branches**,
+  `type-check`/`lint`/`build` ✅.
+- **Landing siempre visible + fix `PublicLayout` @ WIP (20-oct)**: se resolvió la
+  decisión pendiente — `/` **no** redirige a `/dashboard` con sesión; el CTA se adapta
+  (`Sign in` → `/login`, con sesión `Go to dashboard` → `/dashboard`) en `LandingView` y en el
+  header de `PublicLayout`. Guard sin el branch `landing && authenticated`; catch-all sigue a `/`.
+  Contenido nuevo en la landing: *What is this?* (propósito, 2 párrafos), *pipeline*
+  (`lab_source` → ETL resumable → `lab_target`, 3 cards con iconos) y *What can you do with it?*
+  (3 capacidades). **Bug real encontrado por el test de router**: `PublicLayout` usaba
+  `<slot />` en vez de `<RouterView />` ⇒ la ruta hija `landing` **nunca se renderizaba** en la
+  app real (solo header+footer); corregido y su spec ahora monta `RouterView` raíz en vez de
+  pasar slot. También se borraron `tsconfig.*.tsbuildinfo` obsoletos (arrastraban un
+  `__debug__.spec.ts` ya eliminado y rompían `vue-tsc --build`). Verificado: **110 tests**,
+  cobertura **98.35% stmts / 95.34% branches**, `type-check`/`lint`/`build` ✅.
 - **PR #40 abierto** (`feature/jobs-scheduler-api` → `main`) — *un solo PR* (decisión del
   usuario), 7 commits, 98 archivos / +15.3k líneas: **secureid T1** + **frontend Issues #17-#19**
   + **infra hosts/puertos**. Push + `gh pr create` autorizados por el usuario; `gh release`
@@ -33,11 +70,44 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
   cifrados AES-256-GCM determinista (nonce = HMAC-SHA256 con subclave derivada del master key),
   formato `v1.<base64url(nonce||ct||tag)>`, `SealUUID/OpenUUID/SealInt64/OpenInt64`, sentinelas
   `ErrInvalidKey/ErrInvalidToken`. Config `SecureIDKey` desde env `SECURE_ID_KEY` (base64 o hex,
-  32 bytes exactos; falta ⇒ arranque falla). **T2 pendiente**: cablear en handlers —enmascarar
-  `:id` en paths de source/target/scheduler y todos los IDs de los JSON (`customer_id`,
-  `order_items.id` int64, etc.)—, inyectar codec en `cmd/api/main.go`, regenerar swagger y
-  actualizar tests de handler. Decisión: determinismo obligatorio para que las referencias
-  cruzadas en JSON produzcan el mismo token.
+  32 bytes exactos; falta ⇒ arranque falla). Decisión: determinismo obligatorio para que las
+  referencias cruzadas en JSON produzcan el mismo token.
+- **T2 secureid — decisiones de diseño tomadas (usuario, 19-oct)**: alcance completo = URLs +
+  bodies de request + respuestas. Tres acuerdos:
+  1. **Outbound** → interceptar en `RespondJSON`/`RespondData`/`RespondPaginated` con un walk
+     recursivo del JSON que selle toda key `id`/`*_id` que parsee como UUID o int64. *No* se
+     crea capa DTO (los handlers serializan modelos GORM directos hoy).
+  2. **Inbound** → **solo token**: `parseUUIDParam` y `parseOptionalUUID` rechazan con 400
+     cualquier UUID crudo (formato interno no expuesto).
+  3. **Alcance** → paths `:id` (17 rutas), filtros query (`customer_id`/`order_id`/`product_id`),
+     bodies de escritura (`data_write.go` con `uuid.UUID`+binding ⇒ pasar a `string` + abrir) y
+     todos los IDs de responses (incl. `order_items.id` **int64**, `CronSchedule.schedule_id`
+     **nullable** y `auth` `/me`).
+  Inyección vía `router.Dependencies.Codec` + context value (los respondedores son funciones
+  libres). El `user_id` interno del JWT **no** se toca (va firmado, no es JSON de respuesta).
+  Momento óptimo: el frontend aún no consume IDs (#20-#24 son placeholders) ⇒ romper contrato
+  es gratis.
+- ✅ **T2 secureid COMPLETADO @ 3ac309f (19-oct, revisado por el orquestador)**: `handler/secureid.go`
+  nuevo (`WithCodec`/`codecFrom`, walk `sealJSONValue`/`sealInto`/`sealIDInto` con `json.Decoder`
+  preservando orden de claves y escaping, `isOpaqueIDKey` = `id` exacto o sufijo `_id`,
+  `openInboundID` token-only, `invalidIDHint`, `respondInvalidID`). DTOs de borde en `handler`
+  (`OrderCreateRequest`/`OrderItemRequest`, ids `string`); el servicio mantiene `uuid.UUID`.
+  `RespondJSON` sella, `RespondData` delega, `RespondPaginated` intacto (meta nunca sellada).
+  Login/Refresh/Me pasan de `c.JSON` a `RespondJSON`. Swagger regenerado (25 menciones
+  "opaque token"). **Fail-closed confirmado**: `config.Load()` → error si falta `SECURE_ID_KEY`,
+  `secureid.New` → error si la clave es inválida, `main.go` propaga con `%w`; sin codec no arranca.
+  **E2E verificado en vivo** (binario nuevo en `:8080`): id sellado en lista y detalle, determinismo
+  list↔detail, `GET /customers/{token}` 200, UUID crudo → 400 `must be an opaque id`, token corrupto
+  → 400, filtro query por token 200 / por UUID crudo 400, `order_items.id` (int64) → token string,
+  `/auth/me` y `/auth/refresh` con id sellado, swagger 200, todo vía Caddy 200.
+  Cobertura: `handler` 87.3%→**88.7%**, `router` 99.1%, `secureid` 91.0%. `make build`/`go vet`/
+  `go test -race` (21 paquetes ok) limpios.
+- ✅ **`make lint` VERDE (19-oct)**: saneados los 8 hallazgos preexistentes — `rand.Read` sin
+  comprobar en `config_test.go`/`config_cors_test.go`/`secureid_test.go` (helpers ahora reciben
+  `t` y usan `t.Fatalf`), rama vacía `SA9003` en `secureid/secureid.go` (**código muerto
+  redundante**: la validación real de longitud ya existe al final de `open()`, no era agujero de
+  seguridad), tipo `fileRef` sin usar en `migrate.go` y `p.Submit` sin comprobar en
+  `worker_test.go` ×3. Verificado: `make lint` exit 0, `go test -race` 21 paquetes ok, `gofmt` limpio.
 - **Frontend Bloque 1 completo @ 0a56550 (Issues #17-#19)**: scaffold `web/` terminado tras
   una sesión previa interrumpida — `LoginView`, `AppLayout` (sidebar RBAC por rol, header con
   email/rol, toggle tema Claro/Oscuro/Sistema), `DashboardView` (tarjetas por sección), `PlaceholderView`
@@ -216,23 +286,49 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
   `config/nav.ts`, `router/index.ts`, `LoginView.vue`, `AppLayout.vue`, `PlaceholderView.vue`
   e `index.html` (`lang="es"`), + tests que las afirman. Decisión anotada: inglés hardcodeado,
   sin librería i18n (solo hay un idioma).
-- **Issue #38 (GitHub)**: dar **color** al tema — la paleta es gris puro (`oklch(x 0 0)`, croma 0
-  en todos los tokens, `chart-1..5` también grises ⇒ analítica ilegible). Alcance mínimo:
-  `--primary/--ring/--accent/--sidebar-primary/--chart-1..5` con matiz y contraste AA medido.
-  Extensión opcional: selector de acento (store `accent.ts` aparte, `gdl.accent`, anti-flash).
-- **Issue #39 (GitHub)**: landing page pública en `/` — crear `LandingView` + `PublicLayout`,
-  mover Dashboard a `/dashboard`. **Cuidado**: `config/nav.ts` tiene el item Dashboard con
-  `to: '/'` y el router filtra `item.to !== '/'`; hay que cambiar ambos juntos o se duplica la
-  ruta. Decisión pendiente: qué hace `/` con sesión iniciada (recomendado: redirect a
-  `/dashboard`). El copy va en inglés (encaja con #37).
+- ✅ **Issue #38 (GitHub) COMPLETADO @ WIP (20-oct, sin commitear)**: color al tema — paleta
+  **azul** (preset blue de shadcn) en `web/src/assets/main.css` **solo con variables**: `:root`
+  y `.dark` → `--primary`/`--ring`/`--sidebar-primary` = Tailwind **blue-600**
+  (`oklch(0.546 0.245 262.881)`, oscuro usa blue-500 para ring/sidebar-primary),
+  `--accent` con tinte azul (blue-100 claro / blue-900 oscuro), `--chart-1..5` multicolor
+  (blue/green/amber/violet/rose; 600 en claro, 400 en oscuro). Fondos/superficies neutros
+  sin cambios. **Contraste AA medido** con script one-off OKLCH→WCAG: **26/26 pares PASS**
+  (texto ≥4.5, iconos/gráficos ≥3, ambos modos). Sin cambios en componentes ni tests:
+  110 tests, cobertura **98.35% / 95.34%**, `type-check`/`lint`/`build` ✅.
+  Extensión opcional futura: selector de acento (store `accent.ts` aparte, `gdl.accent`,
+  anti-flash).
+- ✅ **Issue #39 (GitHub) COMPLETADO @ 259124d (19-oct)**: `LandingView` + `PublicLayout`
+  nuevos, Dashboard movido a `/dashboard`. Copy de la landing en inglés (adelanto del #37).
+  **Trampa resuelta con 3 puntos de acoplamiento** (el issue solo anticipaba 2): `nav.ts`
+  (`to: '/'`→`'/dashboard'`), filtro del router (`item.to !== '/'` → `item.routeName !== 'dashboard'`,
+  inmune a cambios de ruta) y **`DashboardView`** (tenía el mismo filtro por `to`). Arquitectura
+  de rutas: el padre `AppLayout` sigue en `/` con `requiresAuth` y el dashboard es hijo
+  `path: 'dashboard'` — así `/` sin hijo resuelve en la landing y las URLs de secciones
+  (`/customers`, `/jobs`…) **no** se anidan bajo `/dashboard`. Guard: autenticado en `/` ⇒
+  redirect a `/dashboard`; catch-all → `/` y el guard resuelve. `LoginView` redirige tras
+  login a `{ name: 'dashboard' }`. Verificado: **104 tests, 98.23% stmts / 95.3% branches**
+  (subió), `type-check`/`lint`/`build` ✅. Decisiones del subagente a revisar: `meta.public`
+  documental (el guard no lo lee), `PublicLayout` sin toggle de tema, catch-all con doble
+  redirect.
 - Completar Issues #2+ (migraciones de negocio, frontend).
 
 ## Siguiente paso
-- **T2 secureid**: cablear el codec en handlers (paths `:id` + IDs de responses JSON),
-  inyectar en `cmd/api/main.go`, regenerar swagger, tests actualizados.
-- Frontend: **#37** (inglés), **#38** (color) y **#39** (landing en `/`) son puramente
-  frontend y no tocan el backend. Secuenciarlos: **#39** primero (mueve el Dashboard a
-  `/dashboard` y reestructura router/nav), luego **#37** (copy en inglés de landing + resto)
-  y **#38** (color; la landing es buen banco de pruebas).
+- ✅ **T2 secureid cerrado** (@ 3ac309f) — ver arriba. El frontend `web/` **aún no consume
+  tokens**: al construir las tablas CRUD (#20-#24) los ids que reciba de la API son tokens
+  opacos y hay que **pasarlos tal cual** de vuelta en paths/filtros/bodies (no reinterpretarlos).
+- ✅ **Push autorizado por el usuario (21-oct)**: subidos al **PR #40** los bloques WIP
+  (landing siempre visible, Issue #38 paleta azul, footer CC + ThemeToggle). `gh release`
+  sigue denegado. **Ojo**: el PR #40 ya había sido **mergeado** (`ec11a7e`), así que la rama
+  siguió creciendo post-merge ⇒ se abrió el **PR #41** (`feature/jobs-scheduler-api` → `main`)
+  con los 10 commits acumulados (secureid T2, lint, #38, #39, landing, footer/toggle).
+- ✅ **Issue #37 (i18n) RESUELTO @ WIP (21-oct)**: el usuario eligió **doble idioma ES/EN**
+  (no inglés hardcodeado) y delegó la ejecución en `frontend-vue`. Implementado con
+  `vue-i18n@11.4.16`: infra `i18n/` + `stores/locale.ts` + `LanguageToggle.vue` en las 3
+  superficies; todas las cadenas de UI pasan por `t()` (vistas, layout, nav, router meta,
+  footer, toggles). Fuera de alcance por decisión: `document.title` dinámico, i18n de
+  fechas/números, mensajes de error del backend.
+- **Rama**: todo el trabajo sigue en `feature/jobs-scheduler-api` (misma rama del PR #41,
+  decisión del orquestador: no se puede ramificar de `main` porque el frontend solo existe aquí).
+- ✅ **i18n commiteado** (`797b493`) y **subido al PR #41** (push autorizado por el usuario).
 - Luego Issues #20-#24: tablas CRUD, jobs/scheduler, admin logs, analytics.
 - Considerar rate limiting / auditoría de escrituras y logout stateful (denylist de tokens).

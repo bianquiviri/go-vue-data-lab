@@ -1,5 +1,7 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
+import { RouterView } from 'vue-router'
 
 import { createAppRouter } from '../index'
 import { useAuthStore } from '@/stores/auth'
@@ -32,11 +34,19 @@ describe('router/guards', () => {
     expect(router.currentRoute.value.query.redirect).toBe('/admin/logs')
   })
 
-  it('/login redirige a / cuando ya hay sesión', async () => {
+  it('el dashboard (/dashboard) exige sesión', async () => {
+    const router = createAppRouter()
+    await router.push('/dashboard')
+    expect(router.currentRoute.value.name).toBe('login')
+    expect(router.currentRoute.value.query.redirect).toBe('/dashboard')
+  })
+
+  it('/login redirige a /dashboard cuando ya hay sesión', async () => {
     seedSession()
     const router = createAppRouter()
     await router.push('/login')
     expect(router.currentRoute.value.name).toBe('dashboard')
+    expect(router.currentRoute.value.path).toBe('/dashboard')
   })
 
   it('/login con query.redirect devuelve al destino original', async () => {
@@ -60,17 +70,72 @@ describe('router/guards', () => {
     expect(router.currentRoute.value.name).toBe('admin-logs')
   })
 
-  it('una ruta desconocida se resuelve en /', async () => {
-    seedSession()
+  // --- Landing pública (Issue #39) ---
+
+  it('/ sin sesión muestra la landing (pública, sin redirect a login)', async () => {
     const router = createAppRouter()
-    await router.push('/esto-no-existe')
-    expect(router.currentRoute.value.name).toBe('dashboard')
+    await router.push('/')
+    expect(router.currentRoute.value.name).toBe('landing')
+    expect(router.currentRoute.value.path).toBe('/')
   })
 
-  it('el dashboard es la ruta por defecto', async () => {
+  it('/ con sesión sigue mostrando la landing (la landing no se redirige)', async () => {
     seedSession()
     const router = createAppRouter()
     await router.push('/')
+    expect(router.currentRoute.value.name).toBe('landing')
+    expect(router.currentRoute.value.path).toBe('/')
+  })
+
+  it('la landing no exige sesión y está marcada como pública', async () => {
+    const router = createAppRouter()
+    await router.push('/')
+    const record = router.getRoutes().find((route) => route.name === 'landing')
+    expect(record).toBeDefined()
+    expect(record?.meta.public).toBe(true)
+    expect(record?.meta.requiresAuth).toBeUndefined()
+  })
+
+  it('con sesión, `/` monta la landing (no el dashboard) y su CTA lleva al dashboard', async () => {
+    seedSession()
+    const router = createAppRouter()
+    await router.push('/')
+    await router.isReady()
+
+    const wrapper = mount(RouterView, { global: { plugins: [router] } })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="landing-title"]').exists()).toBe(true)
+    expect(wrapper.get('[data-test="landing-cta"]').attributes('href')).toBe('/dashboard')
+    // El layout protegido (sidebar) no se renderiza: no se redirige al dashboard.
+    expect(wrapper.find('[data-test="sidebar"]').exists()).toBe(false)
+  })
+
+  it('/dashboard con sesión entra al dashboard', async () => {
+    seedSession()
+    const router = createAppRouter()
+    await router.push('/dashboard')
     expect(router.currentRoute.value.name).toBe('dashboard')
+  })
+
+  it('una ruta desconocida con sesión cae en la landing (catch-all ⇒ `/`)', async () => {
+    seedSession()
+    const router = createAppRouter()
+    await router.push('/esto-no-existe')
+    expect(router.currentRoute.value.name).toBe('landing')
+    expect(router.currentRoute.value.path).toBe('/')
+  })
+
+  it('una ruta desconocida sin sesión cae en la landing', async () => {
+    const router = createAppRouter()
+    await router.push('/esto-no-existe')
+    expect(router.currentRoute.value.name).toBe('landing')
+  })
+
+  it('no hay rutas duplicadas (una sola ruta por nombre)', async () => {
+    const router = createAppRouter()
+    const names = router.getRoutes().map((route) => route.name)
+    const filtered = names.filter((name) => name !== undefined)
+    expect(new Set(filtered).size).toBe(filtered.length)
   })
 })

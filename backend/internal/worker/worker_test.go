@@ -427,7 +427,9 @@ func TestErrorsReturnsCopy(t *testing.T) {
 		t.Fatal(err)
 	}
 	p.Start(context.Background())
-	p.Submit(1)
+	if err := p.Submit(1); err != nil {
+		t.Fatalf("Submit: %v", err)
+	}
 	p.Stop()
 
 	first := p.Errors()
@@ -648,7 +650,9 @@ func TestMetrics(t *testing.T) {
 
 	p.Start(context.Background())
 	for i := 0; i < 20; i++ {
-		p.Submit(i)
+		if err := p.Submit(i); err != nil {
+			t.Fatalf("Submit(%d): %v", i, err)
+		}
 	}
 	p.Stop()
 
@@ -729,7 +733,9 @@ func TestNoGoroutineLeakAfterStop(t *testing.T) {
 	}
 	p.Start(context.Background())
 	for i := 0; i < 100; i++ {
-		p.Submit(i)
+		if err := p.Submit(i); err != nil {
+			t.Fatalf("Submit(%d): %v", i, err)
+		}
 	}
 	p.Stop()
 

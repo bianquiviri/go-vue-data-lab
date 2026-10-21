@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -44,14 +45,35 @@ type DataResponse struct {
 	Data any `json:"data"`
 }
 
-// RespondJSON writes data as JSON with the given status code.
+// RespondJSON writes data as JSON with the given status code. When the request
+// carries an opaque id codec (see WithCodec), every "id"/"*_id" value in the
+// payload is sealed into an opaque token; without a codec the payload is
+// written unchanged (legacy pass-through for tests and bootstraps).
 func RespondJSON(c *gin.Context, status int, data any) {
-	c.JSON(status, data)
+	codec := codecFrom(c)
+	if codec == nil {
+		c.JSON(status, data)
+		return
+	}
+
+	raw, err := json.Marshal(data)
+	if err != nil {
+		RespondInternalError(c, fmt.Errorf("handler: marshal response payload: %w", err))
+		return
+	}
+
+	sealed, err := sealJSONValue(raw, codec)
+	if err != nil {
+		RespondInternalError(c, fmt.Errorf("handler: seal response payload: %w", err))
+		return
+	}
+
+	c.Data(status, "application/json; charset=utf-8", sealed)
 }
 
 // RespondData writes data wrapped in the standard success envelope.
 func RespondData(c *gin.Context, status int, data any) {
-	c.JSON(status, DataResponse{Data: data})
+	RespondJSON(c, status, DataResponse{Data: data})
 }
 
 // RespondError writes the standard error envelope.

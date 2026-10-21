@@ -7,9 +7,12 @@ import (
 	"time"
 )
 
-func validKeyB64() string {
+func validKeyB64(t *testing.T) string {
+	t.Helper()
 	key := make([]byte, 32)
-	rand.Read(key)
+	if _, err := rand.Read(key); err != nil {
+		t.Fatalf("rand.Read: %v", err)
+	}
 	return base64.StdEncoding.EncodeToString(key)
 }
 
@@ -48,7 +51,7 @@ func TestGetEnvDuration(t *testing.T) {
 func TestLoadJWTTTLs(t *testing.T) {
 	t.Setenv("JWT_ACCESS_TTL", "30m")
 	t.Setenv("JWT_REFRESH_TTL", "72h")
-	t.Setenv("SECURE_ID_KEY", validKeyB64())
+	t.Setenv("SECURE_ID_KEY", validKeyB64(t))
 
 	cfg, err := Load()
 	if err != nil {
@@ -65,7 +68,7 @@ func TestLoadJWTTTLs(t *testing.T) {
 func TestLoadJWTTTLDefaults(t *testing.T) {
 	t.Setenv("JWT_ACCESS_TTL", "")
 	t.Setenv("JWT_REFRESH_TTL", "")
-	t.Setenv("SECURE_ID_KEY", validKeyB64())
+	t.Setenv("SECURE_ID_KEY", validKeyB64(t))
 
 	cfg, err := Load()
 	if err != nil {

@@ -228,7 +228,9 @@ func TestNew_WrongLengthErrorsWrapped(t *testing.T) {
 
 func TestOpenUUID_RejectsUnexpectedPlaintextLength(t *testing.T) {
 	key := make([]byte, 32)
-	rand.Read(key)
+	if _, err := rand.Read(key); err != nil {
+		t.Fatalf("rand.Read: %v", err)
+	}
 	c, _ := New(key)
 	tok := c.SealInt64(42)
 	if _, err := c.OpenUUID(tok); err == nil {
@@ -240,7 +242,9 @@ func TestOpenUUID_RejectsUnexpectedPlaintextLength(t *testing.T) {
 
 func TestOpenInt64_RejectsUnexpectedPlaintextLength(t *testing.T) {
 	key := make([]byte, 32)
-	rand.Read(key)
+	if _, err := rand.Read(key); err != nil {
+		t.Fatalf("rand.Read: %v", err)
+	}
 	c, _ := New(key)
 	tok := c.SealUUID(uuid.New())
 	if _, err := c.OpenInt64(tok); err == nil {

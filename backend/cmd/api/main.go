@@ -30,6 +30,7 @@ import (
 	"github.com/josebianco/go-vue-data-lab/internal/repository"
 	"github.com/josebianco/go-vue-data-lab/internal/router"
 	"github.com/josebianco/go-vue-data-lab/internal/scheduler"
+	"github.com/josebianco/go-vue-data-lab/internal/secureid"
 	"github.com/josebianco/go-vue-data-lab/internal/service"
 )
 
@@ -44,6 +45,7 @@ const shutdownTimeout = 15 * time.Second
 // @title			Go Concurrent Data Processing Lab API
 // @version		1.0
 // @description	REST API for the Go Concurrent Data Processing Lab, a concurrent data processing and synthetic e-commerce analytics platform.
+// @description	All `id` and `*_id` values are opaque ids (tokens of the form `v1.<base64url>`): responses seal them and requests must send them back sealed. Raw UUIDs are rejected with 400 validation_failed. The only exception is the numeric `order_items.id`, which is also returned as a token string.
 // @BasePath		/api/v1
 // @schemes		http https
 func main() {
@@ -69,6 +71,12 @@ func run() error {
 		zap.String("env", cfg.AppEnv),
 		zap.String("version", version),
 	)
+
+	// Opaque id codec: seals every outbound id and gates inbound ids.
+	codec, err := secureid.New(cfg.SecureIDKey)
+	if err != nil {
+		return fmt.Errorf("main: init secure id codec: %w", err)
+	}
 
 	sourceDB, err := database.OpenSource(cfg)
 	if err != nil {
@@ -134,6 +142,8 @@ func run() error {
 		Jobs:      jobManager,
 		Scheduler: sched,
 		Admin:     service.NewFileErrorLogs(cfg.LogPath),
+		// Seal every id in responses and accept only opaque ids inbound.
+		Codec: codec,
 		// Protect the data, jobs and scheduler groups with bearer auth.
 		Middleware: []gin.HandlerFunc{middleware.AuthRequired(tokenManager)},
 		// Mutating source/jobs/scheduler routes need admin or operator.

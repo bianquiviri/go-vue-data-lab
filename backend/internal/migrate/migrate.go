@@ -43,13 +43,6 @@ type Applied struct {
 // migrationFileRe matches "001_name.up.sql" / "001_name.down.sql".
 var migrationFileRe = regexp.MustCompile(`^(\d+)_([A-Za-z0-9][A-Za-z0-9_-]*)\.(up|down)\.sql$`)
 
-type fileRef struct {
-	kind    string // "up" or "down"
-	version int
-	name    string
-	content string
-}
-
 // Discover reads dir and returns all migration pairs ordered by ascending
 // version. Files that do not end in .up.sql / .down.sql are ignored. Every
 // .up.sql must have a matching .down.sql (and vice versa), and versions must

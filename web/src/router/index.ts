@@ -6,36 +6,60 @@ import type { UserRole } from '@/types/auth'
 
 export const APP_ROUTES: RouteRecordRaw[] = [
   {
+    // Landing pública (Issue #39): SIEMPRE visible en `/`, con o sin sesión.
+    // El guard no la redirige; el CTA de la vista se adapta a la sesión.
+    path: '/',
+    component: () => import('@/layouts/PublicLayout.vue'),
+    meta: { public: true },
+    children: [
+      {
+        path: '',
+        name: 'landing',
+        component: () => import('@/views/LandingView.vue'),
+        // `titleKey`: clave i18n (no texto) para que el título sea reactivo al idioma.
+        meta: { public: true, titleKey: 'landing.tagline' },
+      },
+    ],
+  },
+  {
     path: '/login',
     name: 'login',
     component: () => import('@/views/LoginView.vue'),
-    meta: { public: true, title: 'Iniciar sesión' },
+    meta: { public: true, titleKey: 'auth.title' },
   },
   {
+    // Panel protegido. El padre vive en `/` para que las secciones placeholder
+    // conserven sus URLs (/customers, /jobs, ...); el dashboard ocupa la
+    // subruta `dashboard` (/dashboard). `/` en sí no tiene hijo directo ⇒
+    // resuelve en la landing pública de arriba.
     path: '/',
     component: () => import('@/layouts/AppLayout.vue'),
     meta: { requiresAuth: true },
     children: [
       {
-        path: '',
+        path: 'dashboard',
         name: 'dashboard',
         component: () => import('@/views/DashboardView.vue'),
-        meta: { title: 'Dashboard' },
+        meta: { titleKey: 'nav.dashboard.title' },
       },
       // Secciones placeholder (Issues #20-#24); reutilizan PlaceholderView.
-      ...NAV_ITEMS.filter((item) => item.to !== '/').map((item) => ({
+      // El item Dashboard de NAV_ITEMS NO genera ruta propia: la ruta declarada
+      // arriba es la única. Se filtra por routeName (no por `to`) para que el
+      // filtro siga siendo correcto aunque cambie la ruta del dashboard.
+      ...NAV_ITEMS.filter((item) => item.routeName !== 'dashboard').map((item) => ({
         path: item.to.replace(/^\//, ''),
         name: item.routeName,
         component: () => import('@/views/PlaceholderView.vue'),
         meta: {
-          title: item.title,
-          description: item.description,
+          titleKey: item.titleKey,
+          descriptionKey: item.descriptionKey,
           ...(item.roles ? { roles: item.roles satisfies UserRole[] } : {}),
         },
       })),
     ],
   },
   {
+    // Catch-all: redirige a `/`, que es la landing pública (exista o no sesión).
     path: '/:pathMatch(.*)*',
     redirect: '/',
   },
@@ -58,6 +82,7 @@ export function createAppRouter() {
       return { name: 'login', query: { redirect: to.fullPath } }
     }
 
+    // La landing se sirve siempre en `/` (con o sin sesión): sin redirect.
     if (to.name === 'login' && auth.isAuthenticated) {
       return typeof to.query.redirect === 'string' ? to.query.redirect : { name: 'dashboard' }
     }

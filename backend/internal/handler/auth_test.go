@@ -80,9 +80,12 @@ func sampleResult() *service.LoginResult {
 	}
 }
 
+// newAuthEngine mounts the auth routes with the opaque id codec wired, so the
+// user id is returned as an opaque token.
 func newAuthEngine(svc service.AuthService, userID uuid.UUID) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
+	engine.Use(handler.WithCodec(testCodec))
 	h := handler.NewAuthHandler(svc)
 
 	engine.POST("/api/v1/auth/login", h.Login)
@@ -131,7 +134,15 @@ func TestLoginHandlerSuccess(t *testing.T) {
 		t.Fatalf("status = %d, want %d (body: %s)", rec.Code, http.StatusOK, rec.Body.String())
 	}
 
-	var body handler.AuthResponse
+	// The user id is a sealed token, so it cannot unmarshal into uuid.UUID;
+	// decode the user block loosely and keep the typed tokens block.
+	var body struct {
+		User struct {
+			ID    string `json:"id"`
+			Email string `json:"email"`
+		} `json:"user"`
+		Tokens handler.TokensResponse `json:"tokens"`
+	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
@@ -143,6 +154,10 @@ func TestLoginHandlerSuccess(t *testing.T) {
 	}
 	if body.User.Email != "user@example.com" {
 		t.Errorf("email = %q, want %q", body.User.Email, "user@example.com")
+	}
+	// The user id is sealed: it never round-trips as a raw UUID.
+	if want := sealID(svc.loginResult.User.ID); body.User.ID != want {
+		t.Errorf("user id = %q, want sealed token %q", body.User.ID, want)
 	}
 }
 
@@ -242,13 +257,16 @@ func TestMeHandlerSuccess(t *testing.T) {
 	}
 
 	var body struct {
-		User handler.UserResponse `json:"user"`
+		User struct {
+			ID    string `json:"id"`
+			Email string `json:"email"`
+		} `json:"user"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if body.User.ID != userID {
-		t.Errorf("user id = %v, want %v", body.User.ID, userID)
+	if body.User.ID != sealID(userID) {
+		t.Errorf("user id = %q, want sealed token %q", body.User.ID, sealID(userID))
 	}
 }
 

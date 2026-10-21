@@ -5,7 +5,7 @@ import { mount } from '@vue/test-utils'
 import LoginView from '../LoginView.vue'
 import { createAppRouter } from '@/router'
 import { useAuthStore } from '@/stores/auth'
-import { errorEnvelope, flatError, json, makeSession, post } from '@/__tests__/fixtures'
+import { errorEnvelope, flatError, json, makeSession, post, useLocale } from '@/__tests__/fixtures'
 import { server } from '@/__tests__/mocks/server'
 
 /** Monta LoginView dentro del router real (para query.redirect y guards). */
@@ -23,6 +23,8 @@ describe('views/LoginView', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     localStorage.clear()
+    // Español determinista: las aserciones de errores/etiquetas van en ES.
+    useLocale('es')
   })
 
   it('renderiza el formulario de email y contraseña', async () => {
@@ -30,6 +32,37 @@ describe('views/LoginView', () => {
     expect(wrapper.find('input#email').exists()).toBe(true)
     expect(wrapper.find('input#password').exists()).toBe(true)
     expect(wrapper.find('button[type="submit"]').exists()).toBe(true)
+  })
+
+  it('ofrece el selector de idioma junto al de tema en el login', async () => {
+    const { wrapper } = await mountLogin()
+    expect(wrapper.find('[data-test="language-toggle"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="locale-es"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="locale-en"]').exists()).toBe(true)
+  })
+
+  it('cambiar a inglés traduce el formulario de inmediato', async () => {
+    const { wrapper } = await mountLogin()
+    expect(wrapper.text()).toContain('Iniciar sesión')
+
+    await wrapper.get('[data-test="locale-en"]').trigger('click')
+
+    expect(wrapper.text()).toContain('Sign in')
+    expect(wrapper.get('button[type="submit"]').text()).toContain('Sign in')
+  })
+
+  it('muestra el footer compartido con licencia CC y autoría', async () => {
+    const { wrapper } = await mountLogin()
+    expect(wrapper.find('footer[data-test="app-footer"]').exists()).toBe(true)
+    expect(wrapper.get('[data-test="footer-license"]').text()).toContain('CC BY-NC-ND 4.0')
+    expect(wrapper.get('[data-test="footer-author"]').text()).toContain('Jose Antonio Bianco')
+  })
+
+  it('ofrece el toggle de tema (Claro/Oscuro/Sistema) en el login', async () => {
+    const { wrapper } = await mountLogin()
+    expect(wrapper.find('[data-test="theme-light"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="theme-dark"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="theme-system"]').exists()).toBe(true)
   })
 
   it('no envía el formulario si faltan campos y muestra errores', async () => {

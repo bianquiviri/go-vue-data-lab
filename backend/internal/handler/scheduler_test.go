@@ -92,10 +92,13 @@ func (f *fakeSchedulerControl) RunNow(ctx context.Context, id uuid.UUID) (uuid.U
 
 var _ service.SchedulerControl = (*fakeSchedulerControl)(nil)
 
+// schedulerEngine mounts the scheduler routes with the opaque id codec wired,
+// so schedule ids are only accepted and returned as opaque tokens.
 func schedulerEngine(svc service.SchedulerControl) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	h := handler.NewSchedulerHandler(svc)
 	engine := gin.New()
+	engine.Use(handler.WithCodec(testCodec))
 	engine.GET("/api/v1/scheduler/jobs", h.List)
 	engine.POST("/api/v1/scheduler/jobs", h.Create)
 	engine.PUT("/api/v1/scheduler/jobs/:id", h.Update)
@@ -117,12 +120,15 @@ func TestSchedulerList(t *testing.T) {
 		t.Fatalf("expected %d, got %d", http.StatusOK, rec.Code)
 	}
 	var body struct {
-		Data []models.CronSchedule `json:"data"`
+		Data []struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"data"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if len(body.Data) != 1 || body.Data[0].Name != "nightly" {
+	if len(body.Data) != 1 || body.Data[0].Name != "nightly" || body.Data[0].ID == "" {
 		t.Errorf("unexpected list: %+v", body.Data)
 	}
 }
@@ -182,7 +188,7 @@ func TestSchedulerUpdate(t *testing.T) {
 		return models.CronSchedule{ID: got, Name: p.Name, CronExpr: p.CronExpr, Command: p.Command, Enabled: true}, nil
 	}
 
-	rec := doJSON(t, schedulerEngine(svc), http.MethodPut, "/api/v1/scheduler/jobs/"+id.String(),
+	rec := doJSON(t, schedulerEngine(svc), http.MethodPut, "/api/v1/scheduler/jobs/"+sealID(id),
 		`{"name":"new","cron_expr":"0 4 * * *","command":"migrate"}`)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected %d, got %d (body: %s)", http.StatusOK, rec.Code, rec.Body.String())
@@ -211,7 +217,7 @@ func TestSchedulerUpdateNotFound(t *testing.T) {
 		return models.CronSchedule{}, scheduler.ErrNotFound
 	}
 
-	rec := doJSON(t, schedulerEngine(svc), http.MethodPut, "/api/v1/scheduler/jobs/"+uuid.NewString(),
+	rec := doJSON(t, schedulerEngine(svc), http.MethodPut, "/api/v1/scheduler/jobs/"+sealID(uuid.New()),
 		`{"name":"new","cron_expr":"0 4 * * *","command":"migrate"}`)
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected %d, got %d", http.StatusNotFound, rec.Code)
@@ -222,7 +228,7 @@ func TestSchedulerDelete(t *testing.T) {
 	svc := newFakeSchedulerControl(t)
 	svc.del = func(context.Context, uuid.UUID) error { return nil }
 
-	rec := doJSON(t, schedulerEngine(svc), http.MethodDelete, "/api/v1/scheduler/jobs/"+uuid.NewString(), "")
+	rec := doJSON(t, schedulerEngine(svc), http.MethodDelete, "/api/v1/scheduler/jobs/"+sealID(uuid.New()), "")
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("expected %d, got %d", http.StatusNoContent, rec.Code)
 	}
@@ -235,7 +241,7 @@ func TestSchedulerDeleteNotFound(t *testing.T) {
 	svc := newFakeSchedulerControl(t)
 	svc.del = func(context.Context, uuid.UUID) error { return scheduler.ErrNotFound }
 
-	rec := doJSON(t, schedulerEngine(svc), http.MethodDelete, "/api/v1/scheduler/jobs/"+uuid.NewString(), "")
+	rec := doJSON(t, schedulerEngine(svc), http.MethodDelete, "/api/v1/scheduler/jobs/"+sealID(uuid.New()), "")
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected %d, got %d", http.StatusNotFound, rec.Code)
 	}
@@ -251,21 +257,24 @@ func TestSchedulerEnableDisable(t *testing.T) {
 		return models.CronSchedule{ID: got, Enabled: false}, nil
 	}
 
-	rec := doJSON(t, schedulerEngine(svc), http.MethodPost, "/api/v1/scheduler/jobs/"+id.String()+"/enable", "")
+	rec := doJSON(t, schedulerEngine(svc), http.MethodPost, "/api/v1/scheduler/jobs/"+sealID(id)+"/enable", "")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("enable: expected %d, got %d", http.StatusOK, rec.Code)
 	}
 	var enabled struct {
-		Data models.CronSchedule `json:"data"`
+		Data struct {
+			ID      string `json:"id"`
+			Enabled bool   `json:"enabled"`
+		} `json:"data"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &enabled); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if !enabled.Data.Enabled {
-		t.Error("expected enabled=true")
+	if !enabled.Data.Enabled || enabled.Data.ID != sealID(id) {
+		t.Errorf("expected enabled schedule with sealed id, got %+v", enabled.Data)
 	}
 
-	rec = doJSON(t, schedulerEngine(svc), http.MethodPost, "/api/v1/scheduler/jobs/"+id.String()+"/disable", "")
+	rec = doJSON(t, schedulerEngine(svc), http.MethodPost, "/api/v1/scheduler/jobs/"+sealID(id)+"/disable", "")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("disable: expected %d, got %d", http.StatusOK, rec.Code)
 	}
@@ -276,7 +285,7 @@ func TestSchedulerRun(t *testing.T) {
 	jobID := uuid.New()
 	svc.runNow = func(context.Context, uuid.UUID) (uuid.UUID, error) { return jobID, nil }
 
-	rec := doJSON(t, schedulerEngine(svc), http.MethodPost, "/api/v1/scheduler/jobs/"+uuid.NewString()+"/run", "")
+	rec := doJSON(t, schedulerEngine(svc), http.MethodPost, "/api/v1/scheduler/jobs/"+sealID(uuid.New())+"/run", "")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected %d, got %d", http.StatusOK, rec.Code)
 	}
@@ -288,8 +297,8 @@ func TestSchedulerRun(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if body.Data.JobID != jobID.String() {
-		t.Errorf("expected job id %s, got %s", jobID, body.Data.JobID)
+	if body.Data.JobID != sealID(jobID) {
+		t.Errorf("expected sealed job id %s, got %s", sealID(jobID), body.Data.JobID)
 	}
 }
 
@@ -297,7 +306,7 @@ func TestSchedulerRunConflict(t *testing.T) {
 	svc := newFakeSchedulerControl(t)
 	svc.runNow = func(context.Context, uuid.UUID) (uuid.UUID, error) { return uuid.Nil, jobs.ErrJobRunning }
 
-	rec := doJSON(t, schedulerEngine(svc), http.MethodPost, "/api/v1/scheduler/jobs/"+uuid.NewString()+"/run", "")
+	rec := doJSON(t, schedulerEngine(svc), http.MethodPost, "/api/v1/scheduler/jobs/"+sealID(uuid.New())+"/run", "")
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("expected %d, got %d", http.StatusConflict, rec.Code)
 	}
@@ -310,7 +319,7 @@ func TestSchedulerRunNotFound(t *testing.T) {
 	svc := newFakeSchedulerControl(t)
 	svc.runNow = func(context.Context, uuid.UUID) (uuid.UUID, error) { return uuid.Nil, scheduler.ErrNotFound }
 
-	rec := doJSON(t, schedulerEngine(svc), http.MethodPost, "/api/v1/scheduler/jobs/"+uuid.NewString()+"/run", "")
+	rec := doJSON(t, schedulerEngine(svc), http.MethodPost, "/api/v1/scheduler/jobs/"+sealID(uuid.New())+"/run", "")
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected %d, got %d", http.StatusNotFound, rec.Code)
 	}

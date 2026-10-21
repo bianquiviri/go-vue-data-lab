@@ -112,10 +112,6 @@ func (c *Codec) open(token string, wantLen int) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("secureid: invalid token encoding: %w", ErrInvalidToken)
 	}
-	if len(raw) < nonceLen+gcmTagLen+wantLen {
-		// minimum: nonce+tag + at least wantLen ct? ct len = wantLen (plaintext same len) + tag appended
-		// aead.Seal appends tag; so ct includes tag
-	}
 	// GCM: raw = nonce||ct||tag
 	if len(raw) < nonceLen+gcmTagLen {
 		return nil, fmt.Errorf("secureid: invalid token length: %w", ErrInvalidToken)

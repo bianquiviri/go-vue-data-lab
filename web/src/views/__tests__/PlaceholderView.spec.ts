@@ -5,7 +5,7 @@ import { mount } from '@vue/test-utils'
 import PlaceholderView from '../PlaceholderView.vue'
 import { createAppRouter } from '@/router'
 import { useAuthStore } from '@/stores/auth'
-import { makeUser } from '@/__tests__/fixtures'
+import { makeUser, useLocale } from '@/__tests__/fixtures'
 
 async function mountPlaceholder(path: string) {
   const auth = useAuthStore()
@@ -27,6 +27,8 @@ describe('views/PlaceholderView', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     localStorage.clear()
+    // Español determinista: descripción, badge y fallbacks se afirman en ES.
+    useLocale('es')
   })
 
   it('parametriza el título y la descripción desde meta de la ruta', async () => {
@@ -36,6 +38,20 @@ describe('views/PlaceholderView', () => {
     expect(wrapper.text()).toContain('Catálogo de clientes (lab_source)')
   })
 
+  it('en inglés traduce el badge y el párrafo de forma reactiva', async () => {
+    const { wrapper } = await mountPlaceholder('/customers')
+    expect(wrapper.text()).toContain('Próximamente')
+
+    // Cambia el idioma y comprueba que el texto se re-renderiza sin re-montar.
+    useLocale('en')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.text()).toContain('Coming soon')
+    expect(wrapper.text()).toContain('Issues #20–#24')
+    // El nombre de la sección es igual en ambos idiomas.
+    expect(wrapper.text()).toContain('Customers')
+  })
+
   it('marca la sección como próximamente', async () => {
     const { wrapper } = await mountPlaceholder('/jobs')
     expect(wrapper.text()).toContain('Jobs')
@@ -43,13 +59,26 @@ describe('views/PlaceholderView', () => {
     expect(wrapper.text()).toContain('Issues #20')
   })
 
-  it('usa valores por defecto si la ruta no trae meta de nav', async () => {
-    // Cubre el fallback: se monta la vista con un route simulado sin meta.
-    const { router } = await mountPlaceholder('/scheduler')
-    router.currentRoute.value.meta.title = undefined
+  it('cae al item de NAV_ITEMS si la ruta no trae claves de meta', async () => {
+    // Ruta con un name que SÍ está en NAV_ITEMS pero sin meta.titleKey.
+    const auth = useAuthStore()
+    auth.user = makeUser()
+    auth.accessToken = 'access-token'
+    auth.initialized = true
+
+    const router = createAppRouter()
+    router.addRoute({
+      path: '/bare-scheduler',
+      name: 'scheduler',
+      component: PlaceholderView,
+    })
+    await router.push('/bare-scheduler')
+    await router.isReady()
+
     const wrapper = mount(PlaceholderView, { global: { plugins: [router] } })
-    // name 'scheduler' sí está en NAV_ITEMS ⇒ cae al icono/título del item.
+    // Título y descripción salen del item de NAV_ITEMS (claves i18n).
     expect(wrapper.text()).toContain('Scheduler')
+    expect(wrapper.text()).toContain('Programación de tareas cron')
   })
 
   it('usa el fallback absoluto cuando no hay meta ni entrada en NAV_ITEMS', async () => {

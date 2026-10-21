@@ -5,7 +5,7 @@
     ],
     "swagger": "2.0",
     "info": {
-        "description": "REST API for the Go Concurrent Data Processing Lab, a concurrent data processing and synthetic e-commerce analytics platform.",
+        "description": "REST API for the Go Concurrent Data Processing Lab, a concurrent data processing and synthetic e-commerce analytics platform.\nAll `id` and `*_id` values are opaque ids (tokens of the form `v1.\u003cbase64url\u003e`): responses seal them and requests must send them back sealed. Raw UUIDs are rejected with 400 validation_failed. The only exception is the numeric `order_items.id`, which is also returned as a token string.",
         "title": "Go Concurrent Data Processing Lab API",
         "contact": {},
         "version": "1.0"
@@ -414,7 +414,7 @@
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Schedule UUID",
+                        "description": "Schedule id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -465,7 +465,7 @@
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Schedule UUID",
+                        "description": "Schedule id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -509,7 +509,7 @@
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Schedule UUID",
+                        "description": "Schedule id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -556,7 +556,7 @@
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Schedule UUID",
+                        "description": "Schedule id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -603,7 +603,7 @@
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Schedule UUID",
+                        "description": "Schedule id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -767,7 +767,7 @@
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Customer UUID",
+                        "description": "Customer id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -815,7 +815,7 @@
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Customer UUID",
+                        "description": "Customer id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -872,7 +872,7 @@
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Customer UUID",
+                        "description": "Customer id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -905,7 +905,7 @@
         },
         "/source/order-items": {
             "get": {
-                "description": "Paginated order items from lab_source, filterable by order and product.",
+                "description": "Paginated order items from lab_source, filterable by order and product. Each item id (int64) is returned as an opaque token string.",
                 "produces": [
                     "application/json"
                 ],
@@ -931,13 +931,13 @@
                     },
                     {
                         "type": "string",
-                        "description": "Filter by order UUID",
+                        "description": "Filter by order id (opaque token)",
                         "name": "order_id",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "Filter by product UUID",
+                        "description": "Filter by product id (opaque token)",
                         "name": "product_id",
                         "in": "query"
                     }
@@ -992,7 +992,7 @@
                     },
                     {
                         "type": "string",
-                        "description": "Filter by customer UUID",
+                        "description": "Filter by customer id (opaque token)",
                         "name": "customer_id",
                         "in": "query"
                     },
@@ -1037,7 +1037,7 @@
                 }
             },
             "post": {
-                "description": "Creates an order in lab_source. Items are optional; total_amount is computed from them.",
+                "description": "Creates an order in lab_source. Items are optional; total_amount is computed from them. customer_id and every item product_id are opaque ids (tokens); raw UUIDs are rejected with a 400. The response returns every id (and each item id) as an opaque token string.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1050,12 +1050,12 @@
                 "summary": "Create a source order",
                 "parameters": [
                     {
-                        "description": "Order payload",
+                        "description": "Order payload (opaque ids)",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/service.OrderCreateInput"
+                            "$ref": "#/definitions/handler.OrderCreateRequest"
                         }
                     }
                 ],
@@ -1089,7 +1089,7 @@
         },
         "/source/orders/{id}": {
             "get": {
-                "description": "Returns a single order from lab_source by id, including its order items.",
+                "description": "Returns a single order from lab_source by id, including its order items. Every id (and each item id) is returned as an opaque token string.",
                 "produces": [
                     "application/json"
                 ],
@@ -1100,7 +1100,7 @@
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Order UUID",
+                        "description": "Order id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -1148,7 +1148,7 @@
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Order UUID",
+                        "description": "Order id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -1199,7 +1199,7 @@
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Order UUID",
+                        "description": "Order id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -1354,7 +1354,7 @@
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Product UUID",
+                        "description": "Product id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -1402,7 +1402,7 @@
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Product UUID",
+                        "description": "Product id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -1459,7 +1459,7 @@
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Product UUID",
+                        "description": "Product id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -1674,7 +1674,7 @@
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Customer UUID",
+                        "description": "Customer id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -1736,7 +1736,7 @@
                     },
                     {
                         "type": "string",
-                        "description": "Filter by customer UUID",
+                        "description": "Filter by customer id (opaque token)",
                         "name": "customer_id",
                         "in": "query"
                     },
@@ -1783,7 +1783,7 @@
         },
         "/target/orders/{id}": {
             "get": {
-                "description": "Returns a single order from lab_target by id, including its order items.",
+                "description": "Returns a single order from lab_target by id, including its order items. Every id (and each item id) is returned as an opaque token string.",
                 "produces": [
                     "application/json"
                 ],
@@ -1794,7 +1794,7 @@
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Order UUID",
+                        "description": "Order id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -1902,7 +1902,7 @@
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Product UUID",
+                        "description": "Product id (opaque token)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -2049,6 +2049,56 @@
             "properties": {
                 "limit": {
                     "type": "integer"
+                }
+            }
+        },
+        "handler.OrderCreateRequest": {
+            "type": "object",
+            "required": [
+                "customer_id"
+            ],
+            "properties": {
+                "currency": {
+                    "type": "string"
+                },
+                "customer_id": {
+                    "type": "string"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.OrderItemRequest"
+                    }
+                },
+                "order_date": {
+                    "type": "string"
+                },
+                "order_number": {
+                    "type": "string"
+                },
+                "shipping_address": {
+                    "type": "object"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.OrderItemRequest": {
+            "type": "object",
+            "required": [
+                "product_id"
+            ],
+            "properties": {
+                "product_id": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "integer"
+                },
+                "unit_price": {
+                    "type": "number",
+                    "minimum": 0
                 }
             }
         },
@@ -2543,56 +2593,6 @@
                 },
                 "state": {
                     "type": "string"
-                }
-            }
-        },
-        "service.OrderCreateInput": {
-            "type": "object",
-            "required": [
-                "customer_id"
-            ],
-            "properties": {
-                "currency": {
-                    "type": "string"
-                },
-                "customer_id": {
-                    "type": "string"
-                },
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/service.OrderItemInput"
-                    }
-                },
-                "order_date": {
-                    "type": "string"
-                },
-                "order_number": {
-                    "type": "string"
-                },
-                "shipping_address": {
-                    "type": "object"
-                },
-                "status": {
-                    "type": "string"
-                }
-            }
-        },
-        "service.OrderItemInput": {
-            "type": "object",
-            "required": [
-                "product_id"
-            ],
-            "properties": {
-                "product_id": {
-                    "type": "string"
-                },
-                "quantity": {
-                    "type": "integer"
-                },
-                "unit_price": {
-                    "type": "number",
-                    "minimum": 0
                 }
             }
         },

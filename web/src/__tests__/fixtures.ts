@@ -2,6 +2,8 @@ import type { ResponseResolverInfo } from 'msw'
 import { http } from 'msw'
 import { vi } from 'vitest'
 
+import { i18n } from '@/i18n'
+import { useLocaleStore } from '@/stores/locale'
 import type { AuthSession, Tokens, User } from '@/types/auth'
 
 /** Factory para un usuario de prueba (contrato de GET /api/v1/auth/me). */
@@ -114,4 +116,18 @@ export function post(path: string, resolver: Parameters<typeof http.post>[1]) {
 /** Handler GET de conveniencia. */
 export function get(path: string, resolver: Parameters<typeof http.get>[1]) {
   return http.get(api(path), resolver)
+}
+
+/**
+ * Fija el idioma de forma determinista para los specs: actualiza i18n (para
+ * `useI18n()`) y, si hay pinia activa, también el store (para los toggles y
+ * `<html lang>`). Llamar en `beforeEach` de las suites que afirman cadenas.
+ */
+export function useLocale(locale: 'es' | 'en' = 'es'): void {
+  i18n.global.locale.value = locale
+  try {
+    useLocaleStore().setLocale(locale)
+  } catch {
+    // Sin pinia activa (specs que montan con su propio pinia): basta con i18n.
+  }
 }
