@@ -327,8 +327,8 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
   superficies; todas las cadenas de UI pasan por `t()` (vistas, layout, nav, router meta,
   footer, toggles). Fuera de alcance por decisión: `document.title` dinámico, i18n de
   fechas/números, mensajes de error del backend.
-- **Sin commitear**: bloque i18n (24 modificados + 4 creados + 2 specs nuevos en `web/`).
-- **Rama**: todo el trabajo sigue en `feature/jobs-scheduler-api` (misma rama del PR #40,
+- **Rama**: todo el trabajo sigue en `feature/jobs-scheduler-api` (misma rama del PR #41,
   decisión del orquestador: no se puede ramificar de `main` porque el frontend solo existe aquí).
+- ✅ **i18n commiteado** (`797b493`) y **subido al PR #41** (push autorizado por el usuario).
 - Luego Issues #20-#24: tablas CRUD, jobs/scheduler, admin logs, analytics.
 - Considerar rate limiting / auditoría de escrituras y logout stateful (denylist de tokens).
