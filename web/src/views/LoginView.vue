@@ -4,6 +4,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { Loader2 } from 'lucide-vue-next'
 
 import { Button } from '@/components/ui/button'
+import AppFooter from '@/components/AppFooter.vue'
+import ThemeToggle from '@/components/ThemeToggle.vue'
 import {
   Card,
   CardContent,
@@ -55,8 +57,14 @@ async function onSubmit(): Promise<void> {
 </script>
 
 <template>
-  <div class="bg-background flex min-h-screen items-center justify-center p-4">
-    <Card class="w-full max-w-sm">
+  <div class="bg-background flex min-h-screen flex-col">
+    <!-- Toggle de tema también en el login (esquina superior derecha) -->
+    <header class="flex items-center justify-end p-4">
+      <ThemeToggle />
+    </header>
+
+    <main class="flex flex-1 items-center justify-center p-4">
+      <Card class="w-full max-w-sm">
       <CardHeader>
         <CardTitle class="text-xl">Iniciar sesión</CardTitle>
         <CardDescription>Acceso al Go Concurrent Data Processing Lab</CardDescription>
@@ -120,5 +128,9 @@ async function onSubmit(): Promise<void> {
         </form>
       </CardContent>
     </Card>
+    </main>
+
+    <!-- Footer compartido (licencia CC + autoría) en TODAS las vistas -->
+    <AppFooter />
   </div>
 </template>

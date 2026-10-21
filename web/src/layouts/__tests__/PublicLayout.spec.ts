@@ -1,52 +1,95 @@
-import { describe, expect, it } from 'vitest'
-import { mount } from '@vue/test-utils'
-import { createMemoryHistory, createRouter } from 'vue-router'
+import { createPinia, setActivePinia } from 'pinia'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
+import { RouterView, createMemoryHistory, createRouter } from 'vue-router'
 
 import PublicLayout from '../PublicLayout.vue'
+import { useAuthStore } from '@/stores/auth'
+import { makeUser } from '@/__tests__/fixtures'
 
-/** Monta PublicLayout dentro de un router mínimo con la landing y /login. */
-async function mountPublicLayout() {
+/**
+ * Monta la ruta pública (`/` ⇒ PublicLayout + hijo) dentro de un router
+ * mínimo y devuelve el wrapper del RouterView raíz. `authenticated` siembra
+ * el auth store: el acceso del header depende de él.
+ */
+async function mountPublicLayout({ authenticated = false } = {}) {
+  const pinia = createPinia()
+  setActivePinia(pinia)
+
+  if (authenticated) {
+    const auth = useAuthStore()
+    auth.user = makeUser()
+    auth.accessToken = 'access-token'
+    auth.initialized = true
+  }
+
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
       {
         path: '/',
         component: PublicLayout,
-        children: [{ path: '', name: 'landing', component: { template: '<div data-test="slot-content">Hero</div>' } }],
+        children: [
+          {
+            path: '',
+            name: 'landing',
+            component: { template: '<div data-test="slot-content">Hero</div>' },
+          },
+        ],
       },
       { path: '/login', name: 'login', component: { template: '<div />' } },
+      { path: '/dashboard', name: 'dashboard', component: { template: '<div />' } },
     ],
   })
   router.push('/')
   await router.isReady()
 
-  const wrapper = mount(PublicLayout, {
-    global: { plugins: [router] },
-    slots: { default: '<div data-test="slot-content">Hero</div>' },
-  })
-  return { wrapper }
+  const wrapper = mount(RouterView, { global: { plugins: [pinia, router] } })
+  await flushPromises()
+  return { wrapper, router }
 }
 
 describe('layouts/PublicLayout', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
   it('muestra el nombre del proyecto en el header', async () => {
     const { wrapper } = await mountPublicLayout()
     expect(wrapper.get('[data-test="public-brand"]').text()).toContain('Go Data Lab')
   })
 
-  it('el botón Sign in enlaza a /login', async () => {
+  it('sin sesión el botón del header invita a iniciar sesión', async () => {
     const { wrapper } = await mountPublicLayout()
-    const signIn = wrapper.get('[data-test="public-signin"]')
-    expect(signIn.attributes('href')).toBe('/login')
-    expect(signIn.text()).toContain('Sign in')
+    const cta = wrapper.get('[data-test="public-cta"]')
+    expect(cta.text()).toContain('Sign in')
+    expect(cta.attributes('href')).toBe('/login')
   })
 
-  it('renderiza un footer simple', async () => {
+  it('con sesión el botón del header lleva al dashboard', async () => {
+    const { wrapper } = await mountPublicLayout({ authenticated: true })
+    const cta = wrapper.get('[data-test="public-cta"]')
+    expect(cta.text()).toContain('Go to dashboard')
+    expect(cta.attributes('href')).toBe('/dashboard')
+  })
+
+  it('renderiza el footer con licencia CC y autoría', async () => {
     const { wrapper } = await mountPublicLayout()
-    expect(wrapper.find('[data-test="public-footer"]').exists()).toBe(true)
+    expect(wrapper.find('footer[data-test="app-footer"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('Concurrent Data Processing')
+    // Footer compartido: licencia + autor presentes en TODAS las vistas
+    expect(wrapper.get('[data-test="footer-license"]').text()).toContain('CC BY-NC-ND 4.0')
+    expect(wrapper.get('[data-test="footer-author"]').text()).toContain('Jose Antonio Bianco')
   })
 
-  it('renderiza el contenido del slot', async () => {
+  it('ofrece el toggle de tema (Claro/Oscuro/Sistema) en el header público', async () => {
+    const { wrapper } = await mountPublicLayout()
+    expect(wrapper.find('[data-test="theme-light"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="theme-dark"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="theme-system"]').exists()).toBe(true)
+  })
+
+  it('renderiza el contenido de la ruta hija', async () => {
     const { wrapper } = await mountPublicLayout()
     expect(wrapper.get('[data-test="slot-content"]').text()).toBe('Hero')
   })

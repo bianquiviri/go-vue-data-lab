@@ -1,12 +1,28 @@
 <script setup lang="ts">
-import { RouterLink } from 'vue-router'
+import { computed } from 'vue'
+import { RouterLink, RouterView } from 'vue-router'
 
 import { Button } from '@/components/ui/button'
+import AppFooter from '@/components/AppFooter.vue'
+import ThemeToggle from '@/components/ThemeToggle.vue'
+import { useAuthStore } from '@/stores/auth'
 
 /**
  * Layout de las rutas públicas (landing y futuras). NO reutiliza AppLayout:
  * ese asume sesión (sidebar RBAC, usuario, logout, tema).
+ *
+ * La landing se muestra siempre en `/`, así que el acceso del header cambia
+ * según la sesión: "Sign in" para visitantes, "Go to dashboard" con sesión.
+ * El guard del router ya espera a `auth.initialize()` antes de montar la ruta,
+ * por lo que `isAuthenticated` es estable en el primer render.
  */
+const auth = useAuthStore()
+
+const cta = computed(() =>
+  auth.isAuthenticated
+    ? { label: 'Go to dashboard', to: '/dashboard' }
+    : { label: 'Sign in', to: '/login' },
+)
 </script>
 
 <template>
@@ -17,20 +33,21 @@ import { Button } from '@/components/ui/button'
         <RouterLink to="/" class="tracking-tight font-semibold" data-test="public-brand">
           Go Data Lab
         </RouterLink>
-        <Button as-child size="sm" data-test="public-signin">
-          <RouterLink to="/login">Sign in</RouterLink>
-        </Button>
+        <div class="flex items-center gap-2">
+          <ThemeToggle />
+          <Button as-child size="sm" data-test="public-cta">
+            <RouterLink :to="cta.to">{{ cta.label }}</RouterLink>
+          </Button>
+        </div>
       </div>
     </header>
 
     <main class="flex-1">
-      <slot />
+      <!-- RouterView (no <slot/>): la landing es un hijo de esta ruta. -->
+      <RouterView />
     </main>
 
-    <footer class="border-t" data-test="public-footer">
-      <div class="text-muted-foreground mx-auto w-full max-w-5xl px-4 py-6 text-sm">
-        <p>Go Concurrent Data Processing Lab — synthetic e-commerce data platform.</p>
-      </div>
-    </footer>
+    <!-- Footer compartido (licencia CC + autoría) en TODAS las vistas -->
+    <AppFooter />
   </div>
 </template>

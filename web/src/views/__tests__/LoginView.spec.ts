@@ -32,6 +32,20 @@ describe('views/LoginView', () => {
     expect(wrapper.find('button[type="submit"]').exists()).toBe(true)
   })
 
+  it('muestra el footer compartido con licencia CC y autoría', async () => {
+    const { wrapper } = await mountLogin()
+    expect(wrapper.find('footer[data-test="app-footer"]').exists()).toBe(true)
+    expect(wrapper.get('[data-test="footer-license"]').text()).toContain('CC BY-NC-ND 4.0')
+    expect(wrapper.get('[data-test="footer-author"]').text()).toContain('Jose Antonio Bianco')
+  })
+
+  it('ofrece el toggle de tema (Claro/Oscuro/Sistema) en el login', async () => {
+    const { wrapper } = await mountLogin()
+    expect(wrapper.find('[data-test="theme-light"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="theme-dark"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="theme-system"]').exists()).toBe(true)
+  })
+
   it('no envía el formulario si faltan campos y muestra errores', async () => {
     const loginSpy = vi.spyOn(useAuthStore(), 'login')
     const { wrapper } = await mountLogin()

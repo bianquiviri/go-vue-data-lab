@@ -34,6 +34,13 @@ describe('layouts/AppLayout', () => {
     installMatchMedia(false)
   })
 
+  it('muestra el footer compartido con licencia CC y autoría', async () => {
+    const { wrapper } = await mountLayout()
+    expect(wrapper.find('footer[data-test="app-footer"]').exists()).toBe(true)
+    expect(wrapper.get('[data-test="footer-license"]').text()).toContain('CC BY-NC-ND 4.0')
+    expect(wrapper.get('[data-test="footer-author"]').text()).toContain('Jose Antonio Bianco')
+  })
+
   afterEach(() => {
     document.documentElement.classList.remove('dark')
     localStorage.clear()
@@ -47,8 +54,7 @@ describe('layouts/AppLayout', () => {
     expect(titles).toContain('Customers')
     expect(titles).toContain('Jobs')
     // admin-logs solo es visible para admin (RBAC en nav.ts)
-    expect(titles).not.toContain('Admin logs')
-  })
+    expect(titles).not.toContain('Admin logs')  })
 
   it('un admin ve también Admin logs', async () => {
     const { wrapper } = await mountLayout('admin')
