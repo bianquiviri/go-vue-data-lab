@@ -11,6 +11,9 @@
 
 /*
  * Paleta shadcn-vue (estilo new-york, base neutral) con variables CSS.
+ * Issue #38: acento azul (preset blue) en primary/ring/accent/sidebar-primary
+ * y charts multicolor; fondo y superficies neutros sin cambios.
+ * Contraste AA verificado (claro y oscuro) — ver docs/MEMORY.md.
  * El modo oscuro se aplica con la clase `dark` en <html> (ver stores/theme.ts
  * y el script anti-flash de index.html).
  */
@@ -25,32 +28,35 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  /* Issue #38: azul = Tailwind blue-600 (blanco encima ⇒ 5.4:1, AA) */
+  --primary: oklch(0.546 0.245 262.881);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
   --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
+  /* Hover/selected con tinte azul (blue-100) sobre texto oscuro */
+  --accent: oklch(0.932 0.032 255.101);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --ring: oklch(0.546 0.245 262.881);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary: oklch(0.546 0.245 262.881);
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.97 0 0);
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  /* Charts multicolor (Tailwind 600 ⇒ ≥3:1 sobre card blanco) */
+  --chart-1: oklch(0.546 0.245 262.881); /* blue */
+  --chart-2: oklch(0.627 0.194 149.214); /* green */
+  --chart-3: oklch(0.666 0.157 58.318); /* amber */
+  --chart-4: oklch(0.541 0.281 293.009); /* violet */
+  --chart-5: oklch(0.586 0.158 17.305); /* rose */
 }
 
 .dark {
@@ -60,32 +66,35 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  /* Azul blue-600 también en oscuro: blanco encima ⇒ 5.4:1 (AA) */
+  --primary: oklch(0.546 0.245 262.881);
+  --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
   --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
+  /* Hover/selected con tinte azul (blue-900) sobre texto claro */
+  --accent: oklch(0.302 0.043 257.042);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: oklch(0.985 0 0);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --ring: oklch(0.623 0.214 259.815);
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary: oklch(0.623 0.214 259.815);
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  --sidebar-ring: oklch(0.623 0.214 259.815);
+  /* Charts en oscuro: matices Tailwind 400 ⇒ visibles sobre card 0.205 */
+  --chart-1: oklch(0.707 0.165 254.624); /* blue */
+  --chart-2: oklch(0.792 0.209 151.711); /* green */
+  --chart-3: oklch(0.828 0.189 84.429); /* amber */
+  --chart-4: oklch(0.702 0.183 293.541); /* violet */
+  --chart-5: oklch(0.712 0.194 13.428); /* rose */
 }
 
 @theme inline {
