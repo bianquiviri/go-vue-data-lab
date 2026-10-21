@@ -313,10 +313,23 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
 - Completar Issues #2+ (migraciones de negocio, frontend).
 
 ## Siguiente paso
-- ✅ **T2 secureid cerrado** (@ 3ac309f) — ver arriba. El frontend `web/` **aún no consume
-  tokens**: al construir las tablas CRUD (#20-#24) los ids que reciba de la API son tokens
-  opacos y hay que **pasarlos tal cual** de vuelta en paths/filtros/bodies (no reinterpretarlos).
-- ✅ **Push autorizado por el usuario (21-oct)**: subidos al **PR #40** los bloques WIP
+- ✅ **PR #41 mergeado en `main`** (`c47ddfc`). Issues #37 (i18n ES/EN), #38 (paleta) y #39 (landing)
+  **cerrados en GitHub**. Sin PRs abiertos; rama `feature/jobs-scheduler-api` al día con `main`.
+- 🚧 **Issue #20 (Data Tables & Views) IMPLEMENTADO @ WIP (21-oct)** — decisiones del usuario:
+  **solo lectura** (sin CRUD de escritura) y tabla con el **`Table` de shadcn-vue** (sin TanStack).
+  Nuevos: `types/data.ts` (IDs como `string`), `api/data.ts` (source+target, omite filtros vacíos),
+  `composables/useDataList.ts` (paginación+filtros sincronizados con la **query string**, tokens
+  verbatim), `components/{DataTable,DataFilters,StatusBadge}.vue`, `ui/table/**`, y vistas
+  `CustomersView`/`ProductsView`/`OrdersView`/`OrderDetailView`/`TargetView`. Router: `IMPLEMENTED_ROUTES`
+  hace que solo jobs/scheduler/admin-logs sigan en `PlaceholderView`. **Orden client-side** sobre la
+  página actual (el backend ordena fijo ⇒ no hay endpoint de orden). `OrderItemsView` no se creó:
+  el detalle de orden ya tabla sus items.
+  **Revisión del orquestador**: detecté 2 strings hardcodeados en inglés (`useDataList.ts` y
+  `OrderDetailView.vue`) que rompían la regla de i18n ⇒ test rojo + fix usando `table.error`
+  existente (ES/EN). Verificado: **249 tests** (23 archivos), cobertura **97.92% stmts / 92.52%
+  branches**, `type-check`/`lint`/`build` ✅; E2E contra el backend vivo: `source/customers` con
+  meta y tokens `v1.*`, `GET /customers/{token}` ⇒ 200.
+- Luego Issues #21-#24 (jobs/SSE, scheduler, admin, analytics) y #25-#31 (testing/infra/docs).
   (landing siempre visible, Issue #38 paleta azul, footer CC + ThemeToggle). `gh release`
   sigue denegado. **Ojo**: el PR #40 ya había sido **mergeado** (`ec11a7e`), así que la rama
   siguió creciendo post-merge ⇒ se abrió el **PR #41** (`feature/jobs-scheduler-api` → `main`)

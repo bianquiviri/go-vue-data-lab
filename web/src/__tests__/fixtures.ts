@@ -119,6 +119,28 @@ export function get(path: string, resolver: Parameters<typeof http.get>[1]) {
 }
 
 /**
+ * Envelope paginado del backend: {"data":[...],"meta":{page,per_page,total,total_pages}}.
+ * Pasa `meta` para simular varias páginas.
+ */
+export function pagedEnvelope<T>(items: T[], meta: Partial<import('@/types/api').ApiMeta> = {}) {
+  return {
+    data: items,
+    meta: {
+      page: 1,
+      per_page: 20,
+      total: items.length,
+      total_pages: items.length > 0 ? 1 : 0,
+      ...meta,
+    },
+  }
+}
+
+/** Token opaco de ejemplo (formato real del backend: v1.<base64url>). */
+export function opaqueId(tag: string): string {
+  return `v1.${tag}-opaque-token`
+}
+
+/**
  * Fija el idioma de forma determinista para los specs: actualiza i18n (para
  * `useI18n()`) y, si hay pinia activa, también el store (para los toggles y
  * `<html lang>`). Llamar en `beforeEach` de las suites que afirman cadenas.
