@@ -313,6 +313,25 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
 - Completar Issues #2+ (migraciones de negocio, frontend).
 
 ## Siguiente paso
+- 🚧 **Issue #21 (Job Monitoring & Control) EN CURSO (21-oct)** — decisiones del usuario:
+  **(a)** implementar el **SSE en el backend** (no existía: el Issue #16 quedó sin hacer) y luego el
+  frontend lo consume con `EventSource`; **(b)** alcance **completo** del issue: panel de control
+  (start generate / start migrate / stop), progreso en vivo, indicadores de estado, historial
+  paginado y errores de jobs fallidos.
+  **Hallazgo arquitectónico clave**: `jobs.Manager` **no tiene ningún mecanismo de notificación** —
+  `applyProgress` solo muta estado en memoria bajo mutex. Para el SSE hace falta un **broker pub/sub
+  nuevo** en el `Manager` (suscriptores con canal buffered, broadcast no bloqueante, snapshot inicial
+  al suscribirse, cierre al terminar el job). Los endpoints actuales son *pull* (`/status`, `/progress`, `/history`)
+  y siguen siendo válidos; el SSE es aditivo (`GET /api/v1/jobs/events`).
+  ⚠️ SSE + `AuthRequired` (JWT en header) **no funciona con `EventSource` nativo** (no permite headers).
+  **Decisión del usuario**: **token por query param** (`GET /api/v1/jobs/events?token=<access_token>`);
+  es el patrón más simple y compatible. El middleware de auth del SSE debe leer el token del query
+  param (solo **access** tokens, nunca refresh) y se documenta el trade-off (el token puede quedar en
+  logs/URLs). El resto del grupo `/jobs` sigue con `Authorization: Bearer` normal.
+  **Decisión del usuario**: el pub/sub vive **en el `jobs.Manager`** (método `Subscribe(ctx) <-chan Progress`),
+  sin paquete nuevo: el Manager ya tiene el mutex y es quien aplica el progreso.
+  Rama nueva `feature/jobs-monitoring-sse` (creada desde el PR #42 ya que `feature/data-tables-views`
+  está en PR abierto). PR #42 (`feature/data-tables-views` → `main`) sigue **abierto**.
 - ✅ **PR #41 mergeado en `main`** (`c47ddfc`). Issues #37 (i18n ES/EN), #38 (paleta) y #39 (landing)
   **cerrados en GitHub**. Sin PRs abiertos; rama `feature/jobs-scheduler-api` al día con `main`.
 - 🚧 **Issue #20 (Data Tables & Views) IMPLEMENTADO @ WIP (21-oct)** — decisiones del usuario:
