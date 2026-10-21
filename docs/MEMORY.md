@@ -4,6 +4,27 @@ Memoria viva del proyecto. Se carga en cada sesión de opencode.
 Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo.
 
 ## Estado actual
+- ✅ **Footer CC + toggle de tema en todas las vistas @ WIP (21-oct)**: componentes compartidos
+  `components/AppFooter.vue` (proyecto + **"Developed by Jose Antonio Bianco"** + licencia
+  **CC BY-NC-ND 4.0** — la más restrictiva de Creative Commons, enlace con `rel="noopener"`)
+  y `components/ThemeToggle.vue` (Claro/Oscuro/Sistema, extraído del header de AppLayout).
+  Ambos en las **3 superficies**: `PublicLayout` (footer propio reemplazado + toggle en el
+  header junto al CTA), `LoginView` (layout a columna: header con toggle, main centrado,
+  footer al pie) y `AppLayout` (footer tras `<main>`; el bloque de tema inline se eliminó).
+  TDD rojo→verde. Verificado: **123 tests**, cobertura **98.36% stmts / 95.3% branches**,
+  `type-check`/`lint`/`build` ✅.
+- **Landing siempre visible + fix `PublicLayout` @ WIP (20-oct)**: se resolvió la
+  decisión pendiente — `/` **no** redirige a `/dashboard` con sesión; el CTA se adapta
+  (`Sign in` → `/login`, con sesión `Go to dashboard` → `/dashboard`) en `LandingView` y en el
+  header de `PublicLayout`. Guard sin el branch `landing && authenticated`; catch-all sigue a `/`.
+  Contenido nuevo en la landing: *What is this?* (propósito, 2 párrafos), *pipeline*
+  (`lab_source` → ETL resumable → `lab_target`, 3 cards con iconos) y *What can you do with it?*
+  (3 capacidades). **Bug real encontrado por el test de router**: `PublicLayout` usaba
+  `<slot />` en vez de `<RouterView />` ⇒ la ruta hija `landing` **nunca se renderizaba** en la
+  app real (solo header+footer); corregido y su spec ahora monta `RouterView` raíz en vez de
+  pasar slot. También se borraron `tsconfig.*.tsbuildinfo` obsoletos (arrastraban un
+  `__debug__.spec.ts` ya eliminado y rompían `vue-tsc --build`). Verificado: **110 tests**,
+  cobertura **98.35% stmts / 95.34% branches**, `type-check`/`lint`/`build` ✅.
 - **PR #40 abierto** (`feature/jobs-scheduler-api` → `main`) — *un solo PR* (decisión del
   usuario), 7 commits, 98 archivos / +15.3k líneas: **secureid T1** + **frontend Issues #17-#19**
   + **infra hosts/puertos**. Push + `gh pr create` autorizados por el usuario; `gh release`
@@ -249,10 +270,17 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
   `config/nav.ts`, `router/index.ts`, `LoginView.vue`, `AppLayout.vue`, `PlaceholderView.vue`
   e `index.html` (`lang="es"`), + tests que las afirman. Decisión anotada: inglés hardcodeado,
   sin librería i18n (solo hay un idioma).
-- **Issue #38 (GitHub)**: dar **color** al tema — la paleta es gris puro (`oklch(x 0 0)`, croma 0
-  en todos los tokens, `chart-1..5` también grises ⇒ analítica ilegible). Alcance mínimo:
-  `--primary/--ring/--accent/--sidebar-primary/--chart-1..5` con matiz y contraste AA medido.
-  Extensión opcional: selector de acento (store `accent.ts` aparte, `gdl.accent`, anti-flash).
+- ✅ **Issue #38 (GitHub) COMPLETADO @ WIP (20-oct, sin commitear)**: color al tema — paleta
+  **azul** (preset blue de shadcn) en `web/src/assets/main.css` **solo con variables**: `:root`
+  y `.dark` → `--primary`/`--ring`/`--sidebar-primary` = Tailwind **blue-600**
+  (`oklch(0.546 0.245 262.881)`, oscuro usa blue-500 para ring/sidebar-primary),
+  `--accent` con tinte azul (blue-100 claro / blue-900 oscuro), `--chart-1..5` multicolor
+  (blue/green/amber/violet/rose; 600 en claro, 400 en oscuro). Fondos/superficies neutros
+  sin cambios. **Contraste AA medido** con script one-off OKLCH→WCAG: **26/26 pares PASS**
+  (texto ≥4.5, iconos/gráficos ≥3, ambos modos). Sin cambios en componentes ni tests:
+  110 tests, cobertura **98.35% / 95.34%**, `type-check`/`lint`/`build` ✅.
+  Extensión opcional futura: selector de acento (store `accent.ts` aparte, `gdl.accent`,
+  anti-flash).
 - ✅ **Issue #39 (GitHub) COMPLETADO @ 259124d (19-oct)**: `LandingView` + `PublicLayout`
   nuevos, Dashboard movido a `/dashboard`. Copy de la landing en inglés (adelanto del #37).
   **Trampa resuelta con 3 puntos de acoplamiento** (el issue solo anticipaba 2): `nav.ts`
@@ -272,13 +300,15 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
 - ✅ **T2 secureid cerrado** (@ 3ac309f) — ver arriba. El frontend `web/` **aún no consume
   tokens**: al construir las tablas CRUD (#20-#24) los ids que reciba de la API son tokens
   opacos y hay que **pasarlos tal cual** de vuelta en paths/filtros/bodies (no reinterpretarlos).
-- **Pendiente autorización del usuario**: subir los 3 commits nuevos (decisiones T2, #39, T2) —
-  decidir si van al **PR #40** o se parte en un **PR apilado**.
-- **Decidir con el usuario**: la landing (`/`) redirige a `/dashboard` si hay sesión, así que un
-  usuario logueado **nunca la ve** (le pasó al usuario al revisarla). Opciones: mantener el redirect
-  (solo visitantes) o mostrar la landing siempre y cambiar el CTA a "Go to dashboard" con sesión.
-- Frontend: **#37** (inglés) → **#38** (color). El #39 ya está hecho; la landing es buen banco
-  de pruebas del #38.
+- ✅ **Push autorizado por el usuario (21-oct)**: subidos al **PR #40** los bloques WIP
+  (landing siempre visible, Issue #38 paleta azul, footer CC + ThemeToggle). `gh release`
+  sigue denegado.
+- **Decisión abierta (Issue #37)**: el usuario pide **cambiar todo el texto a inglés *o*
+  hacer doble idioma**. Pendiente de confirmar alcance: (a) inglés hardcodeado completo —
+  la landing/footer ya están en inglés, queda `LoginView`, `AppLayout`, `nav.ts`, `router`,
+  `PlaceholderView`, `index.html lang` — o (b) i18n con selector ES/EN (i18n library +
+  locale files + persistencia; mucho más alcance). Recomendación del orquestador: (a),
+  coherente con la decisión ya anotada.
 - **Rama**: todo el trabajo sigue en `feature/jobs-scheduler-api` (misma rama del PR #40,
   decisión del orquestador: no se puede ramificar de `main` porque el frontend solo existe aquí).
 - Luego Issues #20-#24: tablas CRUD, jobs/scheduler, admin logs, analytics.
