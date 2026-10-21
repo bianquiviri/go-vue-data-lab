@@ -6,8 +6,8 @@ import type { UserRole } from '@/types/auth'
 
 export const APP_ROUTES: RouteRecordRaw[] = [
   {
-    // Landing pública (Issue #39): solo para visitantes. Un usuario con
-    // sesión que abra `/` es redirigido al dashboard en el guard.
+    // Landing pública (Issue #39): SIEMPRE visible en `/`, con o sin sesión.
+    // El guard no la redirige; el CTA de la vista se adapta a la sesión.
     path: '/',
     component: () => import('@/layouts/PublicLayout.vue'),
     meta: { public: true },
@@ -58,8 +58,7 @@ export const APP_ROUTES: RouteRecordRaw[] = [
     ],
   },
   {
-    // Catch-all: redirige a `/` y el guard resuelve según sesión
-    // (sin sesión ⇒ landing; con sesión ⇒ /dashboard).
+    // Catch-all: redirige a `/`, que es la landing pública (exista o no sesión).
     path: '/:pathMatch(.*)*',
     redirect: '/',
   },
@@ -82,11 +81,7 @@ export function createAppRouter() {
       return { name: 'login', query: { redirect: to.fullPath } }
     }
 
-    // La landing es solo para visitantes: con sesión, `/` va al dashboard.
-    if (to.name === 'landing' && auth.isAuthenticated) {
-      return { name: 'dashboard' }
-    }
-
+    // La landing se sirve siempre en `/` (con o sin sesión): sin redirect.
     if (to.name === 'login' && auth.isAuthenticated) {
       return typeof to.query.redirect === 'string' ? to.query.redirect : { name: 'dashboard' }
     }

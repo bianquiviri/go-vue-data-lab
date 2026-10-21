@@ -1,5 +1,7 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
+import { RouterView } from 'vue-router'
 
 import { createAppRouter } from '../index'
 import { useAuthStore } from '@/stores/auth'
@@ -77,12 +79,12 @@ describe('router/guards', () => {
     expect(router.currentRoute.value.path).toBe('/')
   })
 
-  it('/ con sesión redirige a /dashboard', async () => {
+  it('/ con sesión sigue mostrando la landing (la landing no se redirige)', async () => {
     seedSession()
     const router = createAppRouter()
     await router.push('/')
-    expect(router.currentRoute.value.name).toBe('dashboard')
-    expect(router.currentRoute.value.path).toBe('/dashboard')
+    expect(router.currentRoute.value.name).toBe('landing')
+    expect(router.currentRoute.value.path).toBe('/')
   })
 
   it('la landing no exige sesión y está marcada como pública', async () => {
@@ -94,6 +96,21 @@ describe('router/guards', () => {
     expect(record?.meta.requiresAuth).toBeUndefined()
   })
 
+  it('con sesión, `/` monta la landing (no el dashboard) y su CTA lleva al dashboard', async () => {
+    seedSession()
+    const router = createAppRouter()
+    await router.push('/')
+    await router.isReady()
+
+    const wrapper = mount(RouterView, { global: { plugins: [router] } })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="landing-title"]').exists()).toBe(true)
+    expect(wrapper.get('[data-test="landing-cta"]').attributes('href')).toBe('/dashboard')
+    // El layout protegido (sidebar) no se renderiza: no se redirige al dashboard.
+    expect(wrapper.find('[data-test="sidebar"]').exists()).toBe(false)
+  })
+
   it('/dashboard con sesión entra al dashboard', async () => {
     seedSession()
     const router = createAppRouter()
@@ -101,11 +118,12 @@ describe('router/guards', () => {
     expect(router.currentRoute.value.name).toBe('dashboard')
   })
 
-  it('una ruta desconocida con sesión se resuelve en /dashboard', async () => {
+  it('una ruta desconocida con sesión cae en la landing (catch-all ⇒ `/`)', async () => {
     seedSession()
     const router = createAppRouter()
     await router.push('/esto-no-existe')
-    expect(router.currentRoute.value.name).toBe('dashboard')
+    expect(router.currentRoute.value.name).toBe('landing')
+    expect(router.currentRoute.value.path).toBe('/')
   })
 
   it('una ruta desconocida sin sesión cae en la landing', async () => {
