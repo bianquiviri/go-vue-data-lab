@@ -5,7 +5,9 @@ import { useI18n } from 'vue-i18n'
 import { listProducts } from '@/api/data'
 import DataFilters from '@/components/DataFilters.vue'
 import DataTable from '@/components/DataTable.vue'
+import IdChip from '@/components/IdChip.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
+import TruncatedCell from '@/components/TruncatedCell.vue'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useDataList } from '@/composables/useDataList'
 import { type DataTableColumn, type DataScope, type Product } from '@/types/data'
@@ -38,13 +40,13 @@ const CATEGORY_OPTIONS = [
 ].map((value) => ({ value }))
 
 const columns = computed<DataTableColumn[]>(() => [
-  { key: 'id', labelKey: 'data.rowId', class: 'max-w-[12rem]' },
-  { key: 'sku', labelKey: 'data.products.sku' },
-  { key: 'name', labelKey: 'data.products.name' },
-  { key: 'category', labelKey: 'data.products.category' },
-  { key: 'price', labelKey: 'data.products.price', align: 'right' },
-  { key: 'stock', labelKey: 'data.products.stock', align: 'right' },
-  { key: 'status', labelKey: 'data.products.status' },
+  { key: 'id', labelKey: 'data.rowId', class: 'w-[9rem]' },
+  { key: 'sku', labelKey: 'data.products.sku', class: 'min-w-[8rem]' },
+  { key: 'name', labelKey: 'data.products.name', class: 'min-w-[14rem]' },
+  { key: 'category', labelKey: 'data.products.category', class: 'min-w-[8rem]' },
+  { key: 'price', labelKey: 'data.products.price', align: 'right', class: 'min-w-[6rem]' },
+  { key: 'stock', labelKey: 'data.products.stock', align: 'right', class: 'min-w-[5rem]' },
+  { key: 'status', labelKey: 'data.products.status', class: 'min-w-[7rem]' },
 ])
 
 function onFilters(next: Record<string, string>): void {
@@ -83,6 +85,15 @@ function onFilters(next: Record<string, string>): void {
         >
           <template #cell-status="{ value }">
             <StatusBadge :status="String(value)" />
+          </template>
+          <template #cell-id="{ value }">
+            <IdChip :id="String(value)" />
+          </template>
+          <template #cell-sku="{ value }">
+            <TruncatedCell :value="value" class="max-w-[10rem] font-mono text-xs" />
+          </template>
+          <template #cell-name="{ value }">
+            <TruncatedCell :value="value" class="max-w-[18rem]" />
           </template>
         </DataTable>
       </CardContent>

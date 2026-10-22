@@ -86,8 +86,10 @@ describe('views/CustomersView', () => {
 
     expect(wrapper.findAll('[data-test="data-table-row"]')).toHaveLength(1)
     expect(wrapper.text()).toContain('ada@example.com')
-    // El id es un token y se muestra verbatim.
-    expect(wrapper.text()).toContain(CUSTOMER.id)
+    // El id es un token: el chip lo acorta en pantalla pero expone el valor
+    // completo (sin transformar) en el tooltip nativo.
+    const chip = wrapper.get('[data-test="id-chip"]')
+    expect(chip.attributes('title')).toBe(CUSTOMER.id)
   })
 
   it('la búsqueda se refleja en la query string y en la request', async () => {
@@ -218,8 +220,9 @@ describe('views/OrderDetailView', () => {
 
     expect(wrapper.text()).toContain('ORD-1')
     expect(wrapper.findAll('[data-test="data-table-row"]')).toHaveLength(1)
-    // El item también expone sus tokens intactos.
-    expect(wrapper.text()).toContain(ITEM.product_id)
+    // El item también expone sus tokens intactos (tooltip nativo del chip).
+    const productChips = wrapper.findAll('[data-test="id-chip"]')
+    expect(productChips.some((chip) => chip.attributes('title') === ITEM.product_id)).toBe(true)
     expect(paths[0]).toBe(`/api/v1/source/orders/${ORDER.id}`)
   })
 

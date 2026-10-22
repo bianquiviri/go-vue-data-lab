@@ -6,7 +6,8 @@ import { RouterView } from 'vue-router'
 import { createAppRouter } from '../index'
 import { APP_ROUTES } from '../index'
 import { useAuthStore } from '@/stores/auth'
-import { makeUser } from '@/__tests__/fixtures'
+import { get, installEventSource, json, makeUser, pagedEnvelope } from '@/__tests__/fixtures'
+import { server } from '@/__tests__/mocks/server'
 
 describe('router/guards', () => {
   beforeEach(() => {
@@ -190,12 +191,45 @@ describe('router/guards', () => {
     expect(target?.props).toBeUndefined()
   })
 
-  it('jobs y scheduler siguen siendo placeholders', async () => {
+  it('jobs tiene vista real y scheduler sigue siendo placeholder', async () => {
     seedSession()
     const router = createAppRouter()
     await router.push('/jobs')
     expect(router.currentRoute.value.name).toBe('jobs')
-    const record = router.getRoutes().find((route) => route.name === 'jobs')
-    expect(record?.meta.titleKey).toBe('nav.jobs.title')
+    const jobs = router.getRoutes().find((route) => route.name === 'jobs')
+    expect(jobs?.meta.titleKey).toBe('nav.jobs.title')
+
+    await router.push('/scheduler')
+    expect(router.currentRoute.value.name).toBe('scheduler')
+    const scheduler = router.getRoutes().find((route) => route.name === 'scheduler')
+    expect(scheduler?.meta.descriptionKey).toBe('nav.scheduler.description')
+  })
+
+  it('/jobs monta la vista real de monitoreo (no el placeholder)', async () => {
+    seedSession()
+    const es = installEventSource()
+    server.use(
+      get('/jobs/status', () =>
+        json({
+          data: {
+            id: 'v1.job',
+            type: 'generate',
+            status: 'idle',
+            running: false,
+            started_at: null,
+            progress: { job_id: 'v1.job', job_type: '', status: 'idle', entities: [], percent: 0, processed: 0, failed: 0, skipped: 0 },
+          },
+        }),
+      ),
+      get('/jobs/history', () => json(pagedEnvelope([]))),
+    )
+    const router = createAppRouter()
+    await router.push('/jobs')
+    await router.isReady()
+    const wrapper = mount(RouterView, { global: { plugins: [router] } })
+    await flushPromises()
+    expect(wrapper.find('[data-test="jobs-status"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="placeholder"]').exists()).toBe(false)
+    es.restore()
   })
 })

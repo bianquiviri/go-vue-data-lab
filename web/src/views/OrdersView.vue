@@ -7,7 +7,9 @@ import { Eye } from 'lucide-vue-next'
 import { listOrders } from '@/api/data'
 import DataFilters from '@/components/DataFilters.vue'
 import DataTable from '@/components/DataTable.vue'
+import IdChip from '@/components/IdChip.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
+import TruncatedCell from '@/components/TruncatedCell.vue'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useDataList } from '@/composables/useDataList'
@@ -32,12 +34,12 @@ const STATUS_OPTIONS = ['pending', 'paid', 'shipped', 'delivered', 'cancelled', 
 )
 
 const columns = computed<DataTableColumn[]>(() => [
-  { key: 'order_number', labelKey: 'data.orders.orderNumber' },
-  { key: 'customer_id', labelKey: 'data.orders.customer', class: 'max-w-[12rem]' },
-  { key: 'status', labelKey: 'data.orders.status' },
-  { key: 'total_amount', labelKey: 'data.orders.total', align: 'right' },
-  { key: 'currency', labelKey: 'data.orders.currency' },
-  { key: 'order_date', labelKey: 'data.orders.orderDate' },
+  { key: 'order_number', labelKey: 'data.orders.orderNumber', class: 'min-w-[12rem]' },
+  { key: 'customer_id', labelKey: 'data.orders.customer', class: 'w-[9rem]' },
+  { key: 'status', labelKey: 'data.orders.status', class: 'min-w-[7rem]' },
+  { key: 'total_amount', labelKey: 'data.orders.total', align: 'right', class: 'min-w-[6rem]' },
+  { key: 'currency', labelKey: 'data.orders.currency', class: 'min-w-[5rem]' },
+  { key: 'order_date', labelKey: 'data.orders.orderDate', class: 'min-w-[10rem]' },
 ])
 
 function onFilters(next: Record<string, string>): void {
@@ -87,14 +89,14 @@ function detailRoute(order: Order) {
             <StatusBadge :status="String(value)" />
           </template>
           <template #cell-customer_id="{ value }">
-            <span class="font-mono text-xs">{{ value }}</span>
+            <IdChip :id="String(value)" />
           </template>
           <template #cell-order_date="{ value }">
-            <span class="text-muted-foreground text-xs">{{ value }}</span>
+            <TruncatedCell :value="value" class="text-muted-foreground max-w-[12rem] text-xs" />
           </template>
           <template #cell-order_number="{ row, value }">
             <div class="flex items-center gap-2">
-              <span class="font-medium">{{ value }}</span>
+              <TruncatedCell :value="value" class="max-w-[8rem] font-medium" />
               <Button as-child variant="link" size="sm" class="px-0">
                 <RouterLink :to="detailRoute(row as Order)" data-test="order-detail-link">
                   <Eye class="size-3.5" />

@@ -7,6 +7,7 @@ import { ArrowLeft } from 'lucide-vue-next'
 import { getOrder } from '@/api/data'
 import { ApiError } from '@/api/client'
 import DataTable from '@/components/DataTable.vue'
+import IdChip from '@/components/IdChip.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -33,11 +34,11 @@ const error = ref<string | null>(null)
 const orderId = computed(() => String(route.params.id ?? ''))
 
 const itemColumns = computed<DataTableColumn[]>(() => [
-  { key: 'id', labelKey: 'data.rowId', class: 'max-w-[12rem]' },
-  { key: 'product_id', labelKey: 'data.orders.product', class: 'max-w-[12rem]' },
-  { key: 'quantity', labelKey: 'data.orders.quantity', align: 'right' },
-  { key: 'unit_price', labelKey: 'data.orders.unitPrice', align: 'right' },
-  { key: 'subtotal', labelKey: 'data.orders.subtotal', align: 'right' },
+  { key: 'id', labelKey: 'data.rowId', class: 'w-[9rem]' },
+  { key: 'product_id', labelKey: 'data.orders.product', class: 'w-[9rem]' },
+  { key: 'quantity', labelKey: 'data.orders.quantity', align: 'right', class: 'min-w-[5rem]' },
+  { key: 'unit_price', labelKey: 'data.orders.unitPrice', align: 'right', class: 'min-w-[6rem]' },
+  { key: 'subtotal', labelKey: 'data.orders.subtotal', align: 'right', class: 'min-w-[6rem]' },
 ])
 
 /** `PagedResult` sintético para reutilizar el DataTable con los items del detalle. */
@@ -89,7 +90,9 @@ const backRoute = computed(() => (props.scope === 'target' ? '/target' : '/order
           </CardTitle>
           <StatusBadge v-if="order" :status="order.status" />
         </div>
-        <p v-if="order" class="text-muted-foreground font-mono text-xs">{{ order.id }}</p>
+        <p v-if="order" class="text-muted-foreground font-mono text-xs">
+          <IdChip :id="order.id" />
+        </p>
       </CardHeader>
 
       <CardContent class="space-y-6">
@@ -105,7 +108,7 @@ const backRoute = computed(() => (props.scope === 'target' ? '/target' : '/order
           <dl class="grid gap-4 sm:grid-cols-3">
             <div>
               <dt class="text-muted-foreground text-xs">{{ t('data.orders.customer') }}</dt>
-              <dd class="font-mono text-xs">{{ order.customer_id }}</dd>
+              <dd><IdChip :id="order.customer_id" /></dd>
             </div>
             <div>
               <dt class="text-muted-foreground text-xs">{{ t('data.orders.total') }}</dt>
@@ -128,8 +131,11 @@ const backRoute = computed(() => (props.scope === 'target' ? '/target' : '/order
               <Badge variant="secondary">{{ order.order_items?.length ?? 0 }}</Badge>
             </h2>
             <DataTable :columns="itemColumns" :result="itemsResult">
+              <template #cell-id="{ value }">
+                <IdChip :id="String(value)" />
+              </template>
               <template #cell-product_id="{ value }">
-                <span class="font-mono text-xs">{{ value }}</span>
+                <IdChip :id="String(value)" />
               </template>
             </DataTable>
           </div>

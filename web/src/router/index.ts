@@ -12,7 +12,7 @@ import type { UserRole } from '@/types/auth'
  * A medida que los Issues #21-#24 lleguen, las entradas se moverán de los
  * placeholders generados a esta lista.
  */
-const IMPLEMENTED_ROUTES = new Set(['customers', 'products', 'orders', 'target'])
+const IMPLEMENTED_ROUTES = new Set(['customers', 'products', 'orders', 'target', 'jobs'])
 
 /** Placeholder del dashboard: es la única ruta que no sale de NAV_ITEMS. */
 const PLACEHOLDER_ITEMS = NAV_ITEMS.filter((item) => !IMPLEMENTED_ROUTES.has(item.routeName))
@@ -108,7 +108,15 @@ export const APP_ROUTES: RouteRecordRaw[] = [
         meta: { titleKey: titleKeyOf('target') },
       },
 
-      // --- Secciones aún placeholder (Issues #21-#24) ---
+      // --- Jobs: monitoreo y control (Issue #21) ---
+      {
+        path: 'jobs',
+        name: 'jobs',
+        component: () => import('@/views/JobsView.vue'),
+        meta: { titleKey: titleKeyOf('jobs') },
+      },
+
+      // --- Secciones aún placeholder (Issues #22-#24) ---
       // Se generan desde NAV_ITEMS (excepto dashboard y las ya implementadas).
       ...PLACEHOLDER_ITEMS.map((item) => ({
         path: item.to.replace(/^\//, ''),

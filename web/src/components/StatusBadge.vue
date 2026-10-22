@@ -7,10 +7,13 @@ import type { BadgeVariants } from '@/components/ui/badge'
 /**
  * Badge de estado para las tablas de datos (Issue #20). Mapea los estados de
  * order/product del generador a una variante visual del `Badge` de shadcn-vue.
- * El texto del estado NO se traduce: es un valor del dominio que devuelve el
- * backend (p. ej. `paid`, `active`), no una etiqueta de UI.
+ *
+ * Por defecto el texto del estado NO se traduce: es un valor del dominio que
+ * devuelve el backend (p. ej. `paid`, `active`), no una etiqueta de UI. Para
+ * los dominios cerrados y conocidos (los estados de job) se puede pasar
+ * `label` con la traducción: la variante visual sigue saliendo del valor.
  */
-const props = defineProps<{ status: string }>()
+const props = defineProps<{ status: string; label?: string }>()
 
 const VARIANTS: Record<string, BadgeVariants['variant']> = {
   paid: 'default',
@@ -28,5 +31,5 @@ const variant = computed<BadgeVariants['variant']>(() => VARIANTS[props.status] 
 </script>
 
 <template>
-  <Badge :variant="variant" data-test="status-badge">{{ status }}</Badge>
+  <Badge :variant="variant" data-test="status-badge">{{ props.label ?? status }}</Badge>
 </template>

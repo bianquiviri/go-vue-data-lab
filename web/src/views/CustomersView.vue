@@ -5,6 +5,8 @@ import { useI18n } from 'vue-i18n'
 import { listCustomers } from '@/api/data'
 import DataFilters from '@/components/DataFilters.vue'
 import DataTable from '@/components/DataTable.vue'
+import IdChip from '@/components/IdChip.vue'
+import TruncatedCell from '@/components/TruncatedCell.vue'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useDataList } from '@/composables/useDataList'
 import type { Customer, DataTableColumn, DataScope } from '@/types/data'
@@ -32,12 +34,12 @@ const COUNTRY_OPTIONS = ['AU', 'BR', 'CA', 'DE', 'ES', 'FR', 'GB', 'IN', 'JP', '
 )
 
 const columns = computed<DataTableColumn[]>(() => [
-  { key: 'id', labelKey: 'data.rowId', class: 'max-w-[12rem]' },
-  { key: 'first_name', labelKey: 'data.customers.firstName' },
-  { key: 'last_name', labelKey: 'data.customers.lastName' },
-  { key: 'email', labelKey: 'data.customers.email' },
-  { key: 'country_code', labelKey: 'data.customers.country' },
-  { key: 'city', labelKey: 'data.customers.city' },
+  { key: 'id', labelKey: 'data.rowId', class: 'w-[9rem]' },
+  { key: 'first_name', labelKey: 'data.customers.firstName', class: 'min-w-[8rem]' },
+  { key: 'last_name', labelKey: 'data.customers.lastName', class: 'min-w-[8rem]' },
+  { key: 'email', labelKey: 'data.customers.email', class: 'min-w-[14rem]' },
+  { key: 'country_code', labelKey: 'data.customers.country', class: 'min-w-[6rem]' },
+  { key: 'city', labelKey: 'data.customers.city', class: 'min-w-[8rem]' },
 ])
 
 function onFilters(next: Record<string, string>): void {
@@ -70,7 +72,14 @@ function onFilters(next: Record<string, string>): void {
           @update:page="list.goToPage"
           @update:per-page="list.setPerPage"
           @retry="list.refresh"
-        />
+        >
+          <template #cell-id="{ value }">
+            <IdChip :id="String(value)" />
+          </template>
+          <template #cell-email="{ value }">
+            <TruncatedCell :value="value" class="max-w-[16rem]" />
+          </template>
+        </DataTable>
       </CardContent>
     </Card>
   </div>

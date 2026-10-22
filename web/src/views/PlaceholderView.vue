@@ -36,7 +36,7 @@ const description = computed(() => (descriptionKey.value ? t(descriptionKey.valu
 </script>
 
 <template>
-  <div class="mx-auto max-w-2xl">
+  <div class="mx-auto max-w-2xl" data-test="placeholder">
     <Card>
       <CardHeader>
         <div class="flex items-center gap-3">
