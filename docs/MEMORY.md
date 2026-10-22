@@ -4,6 +4,30 @@ Memoria viva del proyecto. Se carga en cada sesión de opencode.
 Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo.
 
 ## Estado actual
+- ✅ **Issue #21 (Job Monitoring & Control) COMPLETADO @ `295a780`+`c56ed97` (22-oct)**: SSE en vivo
+  + panel de control. **Backend**: `jobs.Manager` gana un **broker pub/sub** (`internal/jobs/subscribe.go`)
+  — canales buffered por suscriptor (cap 8), broadcast **no bloqueante** (un cliente lento descarta el
+  evento, nunca frena el job), **snapshot al suscribirse**, evento terminal + **cierre al terminar el job**;
+  `handler.JobsHandler.Events` (`internal/handler/jobs_sse.go`) escribe frames `event: progress` con el
+  payload **sellado por el codec** (`job_id` = token `v1.*`) + heartbeat `: ping` cada 20s;
+  `middleware.AuthRequiredSSE` valida el **access token por query param `?token=`** (EventSource no
+  manda headers; los refresh se rechazan con 401); la ruta SSE se monta **fuera** del grupo `/jobs`.
+  **Frontend**: `JobsView.vue` (`/jobs`) con diálogo de parámetros (generate/migrate), stop, barra de
+  progreso + tabla por entidad en vivo, e historial paginado; `api/jobs.ts` (cliente tipado +
+  `buildJobEventsUrl` con el token codificado), `composables/useJobEvents.ts` (ciclo del EventSource +
+  fallback REST), `components/IdChip.vue` (chip de IDs opacos: **solo acorta la presentación**, el
+  token íntegro va al `title`/portapapeles), `components/TruncatedCell.vue`, `ui/progress/**`.
+  **4 bugs reales encontrados y corregidos en la revisión del orquestador** (details en "Pendientes/bugs"):
+  (1) 🔴 la ruta SSE heredaba el guard bearer del grupo ⇒ **siempre 401** en producción;
+  (2) 🔴 race *send on closed channel* en el broker (2 instancias) ⇒ panic del proceso;
+  (3) 🟠 los `Input type="number"` emiten **números** (Vue castea) ⇒ `value.trim()` reventaba y los jobs
+  no arrancaban con parámetros numéricos; (4) 🟡 label `entities` hardcodeado (regla i18n).
+  Verificado: backend `go build`/`go vet`/`gofmt`/`go test -race` (**21 pkgs ok**)/`golangci-lint`
+  (**0 findings**); frontend **304 tests (30 archivos)**, cobertura **94.72% stmts / 85.97% branches /
+  95.01% funcs / 97% lines**, `type-check`/`lint`/`build` ✅. **E2E en vivo** (Caddy `:8443` → Vite
+  `:5174` → API `:8080`): `?token=` sin header ⇒ **200** `text/event-stream`; sin token/garbage/refresh ⇒
+  **401**; frames de progreso cada **~200ms** (el `encode zstd gzip` de Caddy **no** bufferiza) y evento
+  terminal `completed` con cierre del stream.
 - ✅ **i18n ES/EN con `vue-i18n` @ WIP (21-oct)**: doble idioma real. `web/src/i18n/`
   (`index.ts` con `createI18n({legacy:false})`, `detectLocale()` = `gdl.locale` → `navigator.language`
   (`es*` ⇒ es) → default **`en`**; `fallbackLocale: 'en'`, `SUPPORTED_LOCALES`),
@@ -41,12 +65,11 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
   pasar slot. También se borraron `tsconfig.*.tsbuildinfo` obsoletos (arrastraban un
   `__debug__.spec.ts` ya eliminado y rompían `vue-tsc --build`). Verificado: **110 tests**,
   cobertura **98.35% stmts / 95.34% branches**, `type-check`/`lint`/`build` ✅.
-- **PR #40 abierto** (`feature/jobs-scheduler-api` → `main`) — *un solo PR* (decisión del
-  usuario), 7 commits, 98 archivos / +15.3k líneas: **secureid T1** + **frontend Issues #17-#19**
-  + **infra hosts/puertos**. Push + `gh pr create` autorizados por el usuario; `gh release`
-  sigue denegado. Verificado antes de subir: `go vet`/`go build`/`go test -race` ✅, y en web
-  88 tests, **cobertura 98.07% stmts / 94.87% branches**, `type-check`, `lint`, `build` ✅.
-- **main**: PRs #32-#35 y **#36** mergeados (`2ae4699`). `make build`, `go test -race ./...`
+- ✅ **PRs mergeados**: #40 (`ec11a7e`), **#41** (`c47ddfc`, = `origin/main` actual). El #41 llevó
+  secureid T2 + lint + #38 (paleta) + #39 (landing) + footer/theme-toggle + i18n ES/EN.
+  **PR #42 abierto** (`feature/data-tables-views` → `main`, commit `8c4f937` = Issue #20). `gh release`
+  sigue denegado.
+- **main**: PRs #32-#36 mergeados. `make build`, `go test -race ./...`
   y `go vet ./...` en verde.
 - **Hosts locales nuevos** (decisión del usuario, `/etc/hosts` ya actualizado):
   `127.0.0.1 apidatago.josebianco.local` (API) y `127.0.0.1 frontgodata.josebianco.local` (web).
@@ -176,6 +199,23 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
 - `frontend/` sigue vacío (no trackeado por git); no usar.
 
 ## Decisiones
+- **SSE de jobs (Issue #21)**: el pub/sub vive **en el `jobs.Manager`** (`Subscribe(ctx) <-chan Progress`,
+  sin paquete nuevo: el Manager ya tenía el mutex y es quien aplica el progreso). Broadcast no
+  bloqueante + buffer 8 ⇒ un cliente lento nunca frena el job (descarta eventos). El stream entrega
+  un **snapshot** al suscribirse y se **cierra al terminar el job** (evento terminal primero).
+- **SSE + auth**: `EventSource` nativo no permite cabeceras ⇒ el access token viaja por **query param
+  `?token=`** (`middleware.AuthRequiredSSE`); los refresh tokens se rechazan con 401. Trade-off
+  documentado: el token puede quedar en logs/URLs. El resto del grupo `/jobs` sigue con `Bearer`.
+- **La ruta SSE NO hereda el middleware del grupo `/jobs`**: en gin un subgrupo hereda el middleware del
+  padre y este corre **primero**, así que el guard bearer abortaba con 401 antes de que corriera el
+  guard del query param. Por eso `/jobs/events` se registra en un **grupo propio bajo `/api/v1`**
+  (`registerJobEventsRoute`) y la ruta es **fail-closed**: solo se registra si hay guard
+  (`SSEMiddleware`, o `Middleware` como fallback bearer; sin ninguno ⇒ **404**, nunca abierta).
+- **Canal del suscriptor**: se escribe **y** se cierra siempre bajo `m.subs.mu` ⇒ nunca hay
+  *send on closed channel* (el bug existía en `broadcast` vs `close` y en `Subscribe` vs `broadcastTerminal`).
+  `m.mu` (estado del job) nunca se anida dentro de `m.subs.mu`.
+- **Frontend**: `Input type="number"` de shadcn-vue usa `useVModel` **passive** ⇒ Vue castea el valor a
+  **número**, no cadena. Todo helper que parsea campos numéricos debe aceptar `string | number`.
 - Frontend va en `web/` (no en `frontend/`).
 - Hosts lab: API en `apidatago.josebianco.local`, web en `frontgodata.josebianco.local`
   (el viejo `godata.josebianco.local` quedó obsoleto). TLS con mkcert por host vía Caddy.
@@ -276,6 +316,24 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
   no suba el toolchain (`go 1.24.0` intacto; swag arrastra ese test-dep transitivo).
 
 ## Pendientes / bugs
+- 🟠 **El percent global puede retroceder** (semántica **preexistente** del Issue #13, ahora visible en la
+  UI): `cur.percent = percentOf(sum(done), sum(total))` sobre las **entidades conocidas hasta ese
+  momento** ⇒ cuando aparece una entidad nueva a mitad de job el denominador crece y la barra baja
+  (medido en vivo: 100% → 97% → 90% → 100% con customers/products/orders/order_items). El clamp
+  monótono **no** sirve (se quedaría en 100% tras terminar la 1ª entidad). El fix correcto exige que el
+  runner **declare el plan de entidades con sus totales antes de empezar** (cambio de contrato en
+  `jobs.JobFunc`/runners) para que el agregado sea monótono desde el inicio ⇒ **decisión pendiente del
+  usuario** (no se aplicó en el Issue #21 por ser un cambio transversal).
+- 🟡 **Reconexión del SSE tras el evento terminal**: por diseño el servidor **cierra** el stream cuando el
+  job termina ⇒ el `EventSource` del navegador reconecta solo (cada ~3s, el default) ⇒ con la
+  `JobsView` abierta hay un bucle de reconexión cada 3s (cada reconnect recibe el snapshot del job
+  terminal y se le cierra). El progreso del **siguiente** job se captura en la reconexión (con un hueco
+  de hasta ~3s, mitigado por el snapshot). Opciones: (a) el frontend cierra el `EventSource` al detectar
+  estado terminal y reconecta bajo demanda; (b) el backend mantiene el stream abierto (heartbeat) en vez
+  de cerrarlo (contradice la decisión actual de "cierre al terminar el job").
+- 🟡 **Cobertura frontend bajó** respecto al baseline del #20 (97.92%/92.52% → 94.72%/85.97%): los puntos
+  débiles son las ramas de `composables/useJobEvents.ts` (56.66%) y `api/jobs.ts` (53.57%) — candidatos
+  a tests de seguimiento. Umbral 80% cumplido en todas las métricas.
 - `002_seeders.up.sql` (source) y `003_admin_bootstrap.up.sql` (target) son placeholders (`SELECT 1`)
   **por diseño** (seeders vía generator service; hash del admin en código).
 - `internal/repository` sin tests de integración con DB (los repos GORM requieren Postgres de test;
@@ -313,54 +371,43 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
 - Completar Issues #2+ (migraciones de negocio, frontend).
 
 ## Siguiente paso
-- 🚧 **Issue #21 (Job Monitoring & Control) EN CURSO (21-oct)** — decisiones del usuario:
-  **(a)** implementar el **SSE en el backend** (no existía: el Issue #16 quedó sin hacer) y luego el
-  frontend lo consume con `EventSource`; **(b)** alcance **completo** del issue: panel de control
-  (start generate / start migrate / stop), progreso en vivo, indicadores de estado, historial
-  paginado y errores de jobs fallidos.
-  **Hallazgo arquitectónico clave**: `jobs.Manager` **no tiene ningún mecanismo de notificación** —
-  `applyProgress` solo muta estado en memoria bajo mutex. Para el SSE hace falta un **broker pub/sub
-  nuevo** en el `Manager` (suscriptores con canal buffered, broadcast no bloqueante, snapshot inicial
-  al suscribirse, cierre al terminar el job). Los endpoints actuales son *pull* (`/status`, `/progress`, `/history`)
-  y siguen siendo válidos; el SSE es aditivo (`GET /api/v1/jobs/events`).
-  ⚠️ SSE + `AuthRequired` (JWT en header) **no funciona con `EventSource` nativo** (no permite headers).
-  **Decisión del usuario**: **token por query param** (`GET /api/v1/jobs/events?token=<access_token>`);
-  es el patrón más simple y compatible. El middleware de auth del SSE debe leer el token del query
-  param (solo **access** tokens, nunca refresh) y se documenta el trade-off (el token puede quedar en
-  logs/URLs). El resto del grupo `/jobs` sigue con `Authorization: Bearer` normal.
-  **Decisión del usuario**: el pub/sub vive **en el `jobs.Manager`** (método `Subscribe(ctx) <-chan Progress`),
-  sin paquete nuevo: el Manager ya tiene el mutex y es quien aplica el progreso.
-  Rama nueva `feature/jobs-monitoring-sse` (creada desde el PR #42 ya que `feature/data-tables-views`
-  está en PR abierto). PR #42 (`feature/data-tables-views` → `main`) sigue **abierto**.
-- ✅ **PR #41 mergeado en `main`** (`c47ddfc`). Issues #37 (i18n ES/EN), #38 (paleta) y #39 (landing)
-  **cerrados en GitHub**. Sin PRs abiertos; rama `feature/jobs-scheduler-api` al día con `main`.
-- 🚧 **Issue #20 (Data Tables & Views) IMPLEMENTADO @ WIP (21-oct)** — decisiones del usuario:
+- ⏭️ **Decisión pendiente del usuario: publicación de los Issues #20 + #21.** La rama
+  `feature/jobs-monitoring-sse` está **4 commits por delante de `origin/main`** (`c47ddfc`):
+  `8c4f937` (#20 tablas), `9215573` (memoria), `295a780` (SSE backend), `c56ed97` (monitoring frontend).
+  **El push sigue sin autorizar** (solo se autoriza con pedido explícito). Opciones:
+  (a) **fast-forward** de `feature/data-tables-views` con los 2 commits del #21 ⇒ el **PR #42** (abierto)
+  lleva #20 + #21 en un solo PR (coherente con la decisión previa de "un solo PR"); (b) abrir un PR
+  nuevo desde `feature/jobs-monitoring-sse` y **cerrar el #42 como supersesado** (duplica el commit del #20).
+- ✅ **Issue #21 cerrado** (ver "Estado actual"): backend SSE + panel de control en el frontend, con
+  4 bugs corregidos y E2E en vivo verificado. Queda decidir el **percent global monótono** y el
+  **bucle de reconexión del SSE** (ver "Pendientes/bugs").
+- 🚧 **Issue #20 (Data Tables & Views) IMPLEMENTADO @ `8c4f937` (21-oct)** — decisiones del usuario:
   **solo lectura** (sin CRUD de escritura) y tabla con el **`Table` de shadcn-vue** (sin TanStack).
   Nuevos: `types/data.ts` (IDs como `string`), `api/data.ts` (source+target, omite filtros vacíos),
   `composables/useDataList.ts` (paginación+filtros sincronizados con la **query string**, tokens
   verbatim), `components/{DataTable,DataFilters,StatusBadge}.vue`, `ui/table/**`, y vistas
   `CustomersView`/`ProductsView`/`OrdersView`/`OrderDetailView`/`TargetView`. Router: `IMPLEMENTED_ROUTES`
-  hace que solo jobs/scheduler/admin-logs sigan en `PlaceholderView`. **Orden client-side** sobre la
-  página actual (el backend ordena fijo ⇒ no hay endpoint de orden). `OrderItemsView` no se creó:
-  el detalle de orden ya tabla sus items.
+  hace que solo **scheduler** y **admin-logs** sigan en `PlaceholderView` (jobs ya implementado en #21).
+  **Orden client-side** sobre la página actual (el backend ordena fijo ⇒ no hay endpoint de orden).
+  `OrderItemsView` no se creó: el detalle de orden ya tabla sus items.
   **Revisión del orquestador**: detecté 2 strings hardcodeados en inglés (`useDataList.ts` y
   `OrderDetailView.vue`) que rompían la regla de i18n ⇒ test rojo + fix usando `table.error`
   existente (ES/EN). Verificado: **249 tests** (23 archivos), cobertura **97.92% stmts / 92.52%
   branches**, `type-check`/`lint`/`build` ✅; E2E contra el backend vivo: `source/customers` con
   meta y tokens `v1.*`, `GET /customers/{token}` ⇒ 200.
-- Luego Issues #21-#24 (jobs/SSE, scheduler, admin, analytics) y #25-#31 (testing/infra/docs).
-  (landing siempre visible, Issue #38 paleta azul, footer CC + ThemeToggle). `gh release`
-  sigue denegado. **Ojo**: el PR #40 ya había sido **mergeado** (`ec11a7e`), así que la rama
+- ✅ **PR #41 mergeado en `main`** (`c47ddfc`). Issues #37 (i18n ES/EN), #38 (paleta) y #39 (landing)
+  **cerrados en GitHub**. PR **#42** (`feature/data-tables-views` → `main`) **abierto** con el #20.
+- Luego Issues **#22** (scheduler), **#23** (admin logs) y **#24** (analytics), y #25-#31
+  (testing/infra/docs). (landing siempre visible, Issue #38 paleta azul, footer CC + ThemeToggle).
+  `gh release` sigue denegado. **Ojo**: el PR #40 ya había sido **mergeado** (`ec11a7e`), así que la rama
   siguió creciendo post-merge ⇒ se abrió el **PR #41** (`feature/jobs-scheduler-api` → `main`)
   con los 10 commits acumulados (secureid T2, lint, #38, #39, landing, footer/toggle).
-- ✅ **Issue #37 (i18n) RESUELTO @ WIP (21-oct)**: el usuario eligió **doble idioma ES/EN**
+- ✅ **Issue #37 (i18n) RESUELTO @ `797b493` (21-oct)**: el usuario eligió **doble idioma ES/EN**
   (no inglés hardcodeado) y delegó la ejecución en `frontend-vue`. Implementado con
   `vue-i18n@11.4.16`: infra `i18n/` + `stores/locale.ts` + `LanguageToggle.vue` en las 3
   superficies; todas las cadenas de UI pasan por `t()` (vistas, layout, nav, router meta,
   footer, toggles). Fuera de alcance por decisión: `document.title` dinámico, i18n de
   fechas/números, mensajes de error del backend.
-- **Rama**: todo el trabajo sigue en `feature/jobs-scheduler-api` (misma rama del PR #41,
-  decisión del orquestador: no se puede ramificar de `main` porque el frontend solo existe aquí).
-- ✅ **i18n commiteado** (`797b493`) y **subido al PR #41** (push autorizado por el usuario).
-- Luego Issues #20-#24: tablas CRUD, jobs/scheduler, admin logs, analytics.
+- **Rama**: el trabajo vive en `feature/jobs-monitoring-sse` (4 commits por delante de `origin/main`;
+  contiene a `feature/data-tables-views`, la base del PR #42).
 - Considerar rate limiting / auditoría de escrituras y logout stateful (denylist de tokens).
