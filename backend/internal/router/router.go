@@ -69,6 +69,15 @@ type Dependencies struct {
 	// When empty the group is not registered at all.
 	AdminMiddleware []gin.HandlerFunc
 
+	// SSEMiddleware is an optional hook applied only to the Server-Sent Events
+	// route GET /api/v1/jobs/events. It exists because EventSource cannot set
+	// the Authorization header, so the SSE endpoint needs a token-aware guard
+	// that reads the token from the query string (see middleware.AuthRequiredSSE)
+	// instead of the group's bearer guard. The SSE route is registered outside
+	// the /jobs group chain, so this hook replaces — and never stacks on top
+	// of — Middleware for that route.
+	SSEMiddleware []gin.HandlerFunc
+
 	// Codec is the opaque id codec. When provided, every response seals its
 	// id / *_id values into opaque tokens and every inbound id (path, query
 	// or body) must be an opaque token; raw UUIDs are rejected with a 400.
@@ -233,6 +242,35 @@ func registerJobRoutes(v1 *gin.RouterGroup, deps Dependencies) {
 	jobsGroup.GET("/status", h.Status)
 	jobsGroup.GET("/history", h.History)
 	jobsGroup.GET("/progress", h.Progress)
+
+	registerJobEventsRoute(v1, deps, h)
+}
+
+// registerJobEventsRoute mounts GET /api/v1/jobs/events on a standalone group
+// under /api/v1, outside the /jobs group middleware chain.
+//
+// The route must not inherit the group's bearer guard: a browser EventSource
+// cannot send an Authorization header, so the stream is authenticated with a
+// dedicated query-parameter guard (middleware.AuthRequiredSSE). Inheriting the
+// group middleware would abort every EventSource request with 401 before the
+// SSE guard ever runs.
+//
+// The route is fail-closed: it is registered only when a guard is available.
+// SSEMiddleware is preferred (the query-token guard used in production);
+// Middleware is the bearer-only fallback for non-browser clients. Without any
+// guard the endpoint is not registered at all, exactly like the admin group.
+func registerJobEventsRoute(v1 *gin.RouterGroup, deps Dependencies, h *handler.JobsHandler) {
+	guard := deps.SSEMiddleware
+	if len(guard) == 0 {
+		guard = deps.Middleware
+	}
+	if len(guard) == 0 {
+		return
+	}
+
+	events := v1.Group("/jobs/events")
+	events.Use(guard...)
+	events.GET("", h.Events)
 }
 
 // registerSchedulerRoutes mounts the cron schedule endpoints when a scheduler

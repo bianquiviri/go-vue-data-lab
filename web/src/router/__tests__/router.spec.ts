@@ -4,8 +4,10 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { RouterView } from 'vue-router'
 
 import { createAppRouter } from '../index'
+import { APP_ROUTES } from '../index'
 import { useAuthStore } from '@/stores/auth'
-import { makeUser } from '@/__tests__/fixtures'
+import { get, installEventSource, json, makeUser, pagedEnvelope } from '@/__tests__/fixtures'
+import { server } from '@/__tests__/mocks/server'
 
 describe('router/guards', () => {
   beforeEach(() => {
@@ -137,5 +139,97 @@ describe('router/guards', () => {
     const names = router.getRoutes().map((route) => route.name)
     const filtered = names.filter((name) => name !== undefined)
     expect(new Set(filtered).size).toBe(filtered.length)
+  })
+
+  // --- Issue #20: rutas reales de datos ---
+
+  it('registra las vistas reales de datos con sesión', async () => {
+    seedSession()
+    const router = createAppRouter()
+    for (const name of ['customers', 'products', 'orders', 'target', 'order-detail']) {
+      expect(router.getRoutes().some((route) => route.name === name)).toBe(true)
+    }
+  })
+
+  it('/orders/:id resuelve al detalle y NO al listado', async () => {
+    seedSession()
+    const router = createAppRouter()
+    const token = 'v1.order-opaque-token-abc'
+    await router.push(`/orders/${token}`)
+
+    expect(router.currentRoute.value.name).toBe('order-detail')
+    // El token opaco llega intacto al param de la ruta (nunca se parsea).
+    expect(router.currentRoute.value.params.id).toBe(token)
+  })
+
+  it('/orders con query extra sigue siendo el listado', async () => {
+    seedSession()
+    const router = createAppRouter()
+    await router.push({ path: '/orders', query: { status: 'paid', page: '2' } })
+
+    expect(router.currentRoute.value.name).toBe('orders')
+    expect(router.currentRoute.value.query.status).toBe('paid')
+  })
+
+  it('/target es la vista de destino y exige sesión', async () => {
+    seedSession()
+    const router = createAppRouter()
+    await router.push('/target')
+    expect(router.currentRoute.value.name).toBe('target')
+  })
+
+  it('las secciones de datos pasan scope=source|target por props', () => {
+    const protectedLayout = APP_ROUTES.find((route) => route.meta?.requiresAuth === true)
+    const children = protectedLayout?.children ?? []
+    const customers = children.find((child) => child.name === 'customers')
+    expect(customers?.props).toEqual({ scope: 'source' })
+    // El detalle también fija el scope del esquema.
+    const detail = children.find((child) => child.name === 'order-detail')
+    expect(detail?.props).toEqual({ scope: 'source' })
+    // TargetView resuelve el scope internamente (no recibe props).
+    const target = children.find((child) => child.name === 'target')
+    expect(target?.props).toBeUndefined()
+  })
+
+  it('jobs tiene vista real y scheduler sigue siendo placeholder', async () => {
+    seedSession()
+    const router = createAppRouter()
+    await router.push('/jobs')
+    expect(router.currentRoute.value.name).toBe('jobs')
+    const jobs = router.getRoutes().find((route) => route.name === 'jobs')
+    expect(jobs?.meta.titleKey).toBe('nav.jobs.title')
+
+    await router.push('/scheduler')
+    expect(router.currentRoute.value.name).toBe('scheduler')
+    const scheduler = router.getRoutes().find((route) => route.name === 'scheduler')
+    expect(scheduler?.meta.descriptionKey).toBe('nav.scheduler.description')
+  })
+
+  it('/jobs monta la vista real de monitoreo (no el placeholder)', async () => {
+    seedSession()
+    const es = installEventSource()
+    server.use(
+      get('/jobs/status', () =>
+        json({
+          data: {
+            id: 'v1.job',
+            type: 'generate',
+            status: 'idle',
+            running: false,
+            started_at: null,
+            progress: { job_id: 'v1.job', job_type: '', status: 'idle', entities: [], percent: 0, processed: 0, failed: 0, skipped: 0 },
+          },
+        }),
+      ),
+      get('/jobs/history', () => json(pagedEnvelope([]))),
+    )
+    const router = createAppRouter()
+    await router.push('/jobs')
+    await router.isReady()
+    const wrapper = mount(RouterView, { global: { plugins: [router] } })
+    await flushPromises()
+    expect(wrapper.find('[data-test="jobs-status"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="placeholder"]').exists()).toBe(false)
+    es.restore()
   })
 })

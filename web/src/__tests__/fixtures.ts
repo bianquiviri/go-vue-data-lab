@@ -119,6 +119,28 @@ export function get(path: string, resolver: Parameters<typeof http.get>[1]) {
 }
 
 /**
+ * Envelope paginado del backend: {"data":[...],"meta":{page,per_page,total,total_pages}}.
+ * Pasa `meta` para simular varias páginas.
+ */
+export function pagedEnvelope<T>(items: T[], meta: Partial<import('@/types/api').ApiMeta> = {}) {
+  return {
+    data: items,
+    meta: {
+      page: 1,
+      per_page: 20,
+      total: items.length,
+      total_pages: items.length > 0 ? 1 : 0,
+      ...meta,
+    },
+  }
+}
+
+/** Token opaco de ejemplo (formato real del backend: v1.<base64url>). */
+export function opaqueId(tag: string): string {
+  return `v1.${tag}-opaque-token`
+}
+
+/**
  * Fija el idioma de forma determinista para los specs: actualiza i18n (para
  * `useI18n()`) y, si hay pinia activa, también el store (para los toggles y
  * `<html lang>`). Llamar en `beforeEach` de las suites que afirman cadenas.
@@ -129,5 +151,106 @@ export function useLocale(locale: 'es' | 'en' = 'es'): void {
     useLocaleStore().setLocale(locale)
   } catch {
     // Sin pinia activa (specs que montan con su propio pinia): basta con i18n.
+  }
+}
+
+/** Instancia falsa y controlable de `EventSource` para los specs de SSE. */
+export interface FakeEventSource {
+  url: string
+  readyState: number
+  onopen: ((event: Event) => void) | null
+  onerror: ((event: Event) => void) | null
+  listeners: Map<string, Set<(event: MessageEvent) => void>>
+  addEventListener: (type: string, cb: (event: MessageEvent) => void) => void
+  removeEventListener: (type: string, cb: (event: MessageEvent) => void) => void
+  close: () => void
+  /** Simula que la conexión se abrió. */
+  open: () => void
+  /** Simula un frame `event: progress` con el payload dado. */
+  emit: (type: string, data: unknown) => void
+  /** Simula un fallo de conexión. */
+  fail: () => void
+  /**
+   * Simula que la conexión se corta y el navegador pasa a CONNECTING: el
+   * `EventSource` real reconectaría SOLO con la misma URL (token viejo).
+   */
+  drop: () => void
+  /** ¿Se llamó a `close()`? */
+  closed: boolean
+}
+
+/**
+ * Instala un `EventSource` global falso y devuelve las instancias creadas. Los
+ * specs pueden inspeccionar `url`, emitir eventos y verificar el cierre.
+ */
+export function installEventSource() {
+  const instances: FakeEventSource[] = []
+  const Original = globalThis.EventSource
+  const CONNECTING = 0
+  const OPEN = 1
+  const CLOSED = 2
+
+  class MockEventSource implements FakeEventSource {
+    static readonly CONNECTING = CONNECTING
+    static readonly OPEN = OPEN
+    static readonly CLOSED = CLOSED
+
+    readonly url: string
+    readyState = CONNECTING
+    onopen: ((event: Event) => void) | null = null
+    onerror: ((event: Event) => void) | null = null
+    listeners = new Map<string, Set<(event: MessageEvent) => void>>()
+    closed = false
+
+    constructor(url: string) {
+      this.url = url
+      instances.push(this)
+    }
+
+    addEventListener(type: string, cb: (event: MessageEvent) => void): void {
+      const set = this.listeners.get(type) ?? new Set()
+      set.add(cb)
+      this.listeners.set(type, set)
+    }
+
+    removeEventListener(type: string, cb: (event: MessageEvent) => void): void {
+      this.listeners.get(type)?.delete(cb)
+    }
+
+    close(): void {
+      this.closed = true
+      this.readyState = CLOSED
+    }
+
+    open(): void {
+      this.readyState = OPEN
+      this.onopen?.(new Event('open'))
+    }
+
+    emit(type: string, data: unknown): void {
+      const event = new MessageEvent(type, { data: JSON.stringify(data) })
+      this.listeners.get(type)?.forEach((cb) => cb(event))
+    }
+
+    fail(): void {
+      this.readyState = CLOSED
+      this.onerror?.(new Event('error'))
+    }
+
+    drop(): void {
+      this.readyState = CONNECTING
+      this.onerror?.(new Event('error'))
+    }
+  }
+
+  vi.stubGlobal('EventSource', MockEventSource)
+  return {
+    instances,
+    /** Última instancia creada (atajo para la mayoría de specs). */
+    latest: () => instances[instances.length - 1],
+    restore: () => {
+      if (Original) vi.stubGlobal('EventSource', Original)
+      else vi.unstubAllGlobals()
+    },
   }
 }

@@ -146,6 +146,9 @@ func run() error {
 		Codec: codec,
 		// Protect the data, jobs and scheduler groups with bearer auth.
 		Middleware: []gin.HandlerFunc{middleware.AuthRequired(tokenManager)},
+		// The SSE stream cannot send an Authorization header: its guard reads
+		// the access token from the ?token= query parameter instead.
+		SSEMiddleware: []gin.HandlerFunc{middleware.AuthRequiredSSE(tokenManager)},
 		// Mutating source/jobs/scheduler routes need admin or operator.
 		WriteMiddleware: []gin.HandlerFunc{middleware.RBAC(models.RoleAdmin, models.RoleOperator)},
 		// /api/v1/admin is guarded by auth and restricted to admins.

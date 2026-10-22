@@ -22,11 +22,12 @@ import (
 type fakeJobControl struct {
 	t *testing.T
 
-	start    func(context.Context, string, any) (uuid.UUID, error)
-	stop     func() error
-	status   func() (jobs.JobStatus, error)
-	progress func() (jobs.Progress, error)
-	history  func(context.Context, int, int) ([]models.JobExecution, int64, error)
+	start     func(context.Context, string, any) (uuid.UUID, error)
+	stop      func() error
+	status    func() (jobs.JobStatus, error)
+	progress  func() (jobs.Progress, error)
+	subscribe func(context.Context) <-chan jobs.Progress
+	history   func(context.Context, int, int) ([]models.JobExecution, int64, error)
 }
 
 func newFakeJobControl(t *testing.T) *fakeJobControl {
@@ -52,6 +53,12 @@ func newFakeJobControl(t *testing.T) *fakeJobControl {
 			unexpected("Progress")
 			return jobs.Progress{}, nil
 		},
+		subscribe: func(context.Context) <-chan jobs.Progress {
+			unexpected("Subscribe")
+			ch := make(chan jobs.Progress)
+			close(ch)
+			return ch
+		},
 		history: func(context.Context, int, int) ([]models.JobExecution, int64, error) {
 			unexpected("History")
 			return nil, 0, nil
@@ -65,6 +72,9 @@ func (f *fakeJobControl) Start(ctx context.Context, jobType string, params any) 
 func (f *fakeJobControl) Stop() error                      { return f.stop() }
 func (f *fakeJobControl) Status() (jobs.JobStatus, error)  { return f.status() }
 func (f *fakeJobControl) Progress() (jobs.Progress, error) { return f.progress() }
+func (f *fakeJobControl) Subscribe(ctx context.Context) <-chan jobs.Progress {
+	return f.subscribe(ctx)
+}
 func (f *fakeJobControl) History(ctx context.Context, page, perPage int) ([]models.JobExecution, int64, error) {
 	return f.history(ctx, page, perPage)
 }

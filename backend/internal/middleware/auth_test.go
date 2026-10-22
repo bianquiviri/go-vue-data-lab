@@ -209,3 +209,153 @@ func TestCurrentUserIDInvalidString(t *testing.T) {
 		t.Error("CurrentUserID() ok = true, want false for invalid uuid")
 	}
 }
+
+// sseEngine mounts a route guarded by AuthRequiredSSE, which reads the token
+// from the ?token= query parameter (with the Authorization header as fallback).
+func sseEngine(tokens *auth.JWTManager, handler gin.HandlerFunc) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	engine.GET("/events", middleware.AuthRequiredSSE(tokens), handler)
+	return engine
+}
+
+// doSSE issues a GET /events request with the given query token and header.
+func doSSE(engine *gin.Engine, token, authorization string) *httptest.ResponseRecorder {
+	path := "/events"
+	if token != "" {
+		path += "?token=" + token
+	}
+	req := httptest.NewRequest(http.MethodGet, path, nil)
+	if authorization != "" {
+		req.Header.Set("Authorization", authorization)
+	}
+	rec := httptest.NewRecorder()
+	engine.ServeHTTP(rec, req)
+	return rec
+}
+
+func TestAuthRequiredSSEAcceptsQueryTokenAndSetsContext(t *testing.T) {
+	m := newTestManager()
+	userID := uuid.New()
+	access, _, err := m.GenerateTokens(userID, "sse@example.com", models.RoleOperator)
+	if err != nil {
+		t.Fatalf("GenerateTokens() error = %v", err)
+	}
+
+	var (
+		gotID    uuid.UUID
+		gotEmail string
+		gotRole  string
+		ok       bool
+	)
+	engine := sseEngine(m, func(c *gin.Context) {
+		gotID, ok = middleware.CurrentUserID(c)
+		gotEmail = c.GetString(middleware.ContextEmail)
+		gotRole = c.GetString(middleware.ContextRole)
+		c.Status(http.StatusOK)
+	})
+
+	rec := doSSE(engine, access, "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if !ok || gotID != userID {
+		t.Errorf("CurrentUserID() = (%v, %v), want (%v, true)", gotID, ok, userID)
+	}
+	if gotEmail != "sse@example.com" {
+		t.Errorf("email = %q, want %q", gotEmail, "sse@example.com")
+	}
+	if gotRole != string(models.RoleOperator) {
+		t.Errorf("role = %q, want %q", gotRole, models.RoleOperator)
+	}
+}
+
+func TestAuthRequiredSSERejectsRefreshToken(t *testing.T) {
+	m := newTestManager()
+	_, refresh, err := m.GenerateTokens(uuid.New(), "sse@example.com", models.RoleViewer)
+	if err != nil {
+		t.Fatalf("GenerateTokens() error = %v", err)
+	}
+
+	engine := sseEngine(m, func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	rec := doSSE(engine, refresh, "")
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+}
+
+func TestAuthRequiredSSERejectsInvalidToken(t *testing.T) {
+	engine := sseEngine(newTestManager(), func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	rec := doSSE(engine, "not-a-token", "")
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+}
+
+func TestAuthRequiredSSEMissingToken(t *testing.T) {
+	engine := sseEngine(newTestManager(), func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	rec := doSSE(engine, "", "")
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+}
+
+func TestAuthRequiredSSEFallsBackToAuthorizationHeader(t *testing.T) {
+	m := newTestManager()
+	access, _, err := m.GenerateTokens(uuid.New(), "sse@example.com", models.RoleViewer)
+	if err != nil {
+		t.Fatalf("GenerateTokens() error = %v", err)
+	}
+
+	engine := sseEngine(m, func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	rec := doSSE(engine, "", "Bearer "+access)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
+func TestAuthRequiredSSEPrefersQueryTokenOverHeader(t *testing.T) {
+	m := newTestManager()
+	valid, _, err := m.GenerateTokens(uuid.New(), "sse@example.com", models.RoleViewer)
+	if err != nil {
+		t.Fatalf("GenerateTokens() error = %v", err)
+	}
+
+	engine := sseEngine(m, func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	// A valid query token wins even when the header carries garbage.
+	rec := doSSE(engine, valid, "Bearer not-a-token")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
+func TestAuthRequiredSSERejectsInvalidQueryTokenEvenWithValidHeader(t *testing.T) {
+	m := newTestManager()
+	valid, _, err := m.GenerateTokens(uuid.New(), "sse@example.com", models.RoleViewer)
+	if err != nil {
+		t.Fatalf("GenerateTokens() error = %v", err)
+	}
+
+	engine := sseEngine(m, func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	// An explicitly supplied but invalid query token is not silently overridden
+	// by the header: it is rejected.
+	rec := doSSE(engine, "not-a-token", "Bearer "+valid)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+}
+
+func TestAuthRequiredSSENilManager(t *testing.T) {
+	engine := sseEngine(nil, func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	rec := doSSE(engine, "whatever", "")
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+}
