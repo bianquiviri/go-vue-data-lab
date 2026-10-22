@@ -199,6 +199,12 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
 - `frontend/` sigue vacío (no trackeado por git); no usar.
 
 ## Decisiones
+- **Numbering de issues**: el numbering de **GitHub lleva un offset (+1)** respecto al interno de
+  `docs/ISSUES.md` (existe un "test issue" #1 en GitHub). Mapeo: interno **#16 (SSE)** → GitHub
+  **#17** · interno **#17/#18/#19 (frontend setup/auth UI/dashboard)** → GitHub **#18/#19/#20** ·
+  interno **#20 (Data Tables)** → GitHub **#21** · interno **#21 (Job Monitoring)** → GitHub **#22** ·
+  interno **#22/#23/#24 (scheduler/admin/analytics UI)** → GitHub **#23/#24/#25**.
+  ⚠️ Al escribir `Closes #N` en un PR, usar **el número de GitHub**, no el interno.
 - **SSE de jobs (Issue #21)**: el pub/sub vive **en el `jobs.Manager`** (`Subscribe(ctx) <-chan Progress`,
   sin paquete nuevo: el Manager ya tenía el mutex y es quien aplica el progreso). Broadcast no
   bloqueante + buffer 8 ⇒ un cliente lento nunca frena el job (descarta eventos). El stream entrega
@@ -371,16 +377,21 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
 - Completar Issues #2+ (migraciones de negocio, frontend).
 
 ## Siguiente paso
-- ⏭️ **Decisión pendiente del usuario: publicación de los Issues #20 + #21.** La rama
-  `feature/jobs-monitoring-sse` está **4 commits por delante de `origin/main`** (`c47ddfc`):
-  `8c4f937` (#20 tablas), `9215573` (memoria), `295a780` (SSE backend), `c56ed97` (monitoring frontend).
-  **El push sigue sin autorizar** (solo se autoriza con pedido explícito). Opciones:
-  (a) **fast-forward** de `feature/data-tables-views` con los 2 commits del #21 ⇒ el **PR #42** (abierto)
-  lleva #20 + #21 en un solo PR (coherente con la decisión previa de "un solo PR"); (b) abrir un PR
-  nuevo desde `feature/jobs-monitoring-sse` y **cerrar el #42 como supersesado** (duplica el commit del #20).
+- ✅ **Issue #21 publicado**: el **PR #42** (`feature/data-tables-views` → `main`) se **actualizó con
+  los 4 commits** del #21 (fast-forward `8c4f937..1b5ec88`, +4.4k líneas) ⇒ el PR lleva
+  **#20 (tablas) + #21 (monitoreo/SSE) + #16 (SSE backend)** en un solo PR. Título actualizado y body
+  reescrito con el mapeo de issues, los 4 bugs corregidos, la verificación y los pendientes.
+  Cierra en GitHub **#17**, **#21** y **#22** al mergear. Estado: **OPEN**, `MERGEABLE`, `mergeStateStatus: CLEAN`,
+  65 archivos / +7.724 / -60. Push autorizado por el usuario (`git push origin feature/data-tables-views`).
+  `gh release` sigue denegado.
+- 🟡 **Issues de GitHub que quedaron abiertos por error de numbering** (ya implementados y mergeados en
+  PRs anteriores, pero nunca cerrados): **#18** (frontend setup), **#19** (authentication UI),
+  **#20** (dashboard & layout) ⇒ cerrar cuando el usuario lo confirme.
+- 🟠 **Decisión pendiente del usuario**: el **percent global retrocede** (100% → 97% → 90%). Fix correcto
+  = que el runner declare el plan de entidades con sus totales antes de empezar (cambio de contrato
+  transversal en `jobs.JobFunc`/runners). Abordarlo en #22 o dejarlo documentado.
 - ✅ **Issue #21 cerrado** (ver "Estado actual"): backend SSE + panel de control en el frontend, con
-  4 bugs corregidos y E2E en vivo verificado. Queda decidir el **percent global monótono** y el
-  **bucle de reconexión del SSE** (ver "Pendientes/bugs").
+  4 bugs corregidos y E2E en vivo verificado.
 - 🚧 **Issue #20 (Data Tables & Views) IMPLEMENTADO @ `8c4f937` (21-oct)** — decisiones del usuario:
   **solo lectura** (sin CRUD de escritura) y tabla con el **`Table` de shadcn-vue** (sin TanStack).
   Nuevos: `types/data.ts` (IDs como `string`), `api/data.ts` (source+target, omite filtros vacíos),
