@@ -4,6 +4,25 @@ Memoria viva del proyecto. Se carga en cada sesión de opencode.
 Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo.
 
 ## Estado actual
+- ✅ **Issue #22 interno (Scheduler Management UI) COMPLETADO @ `b93cbb7` (22-oct, rama
+  `feature/scheduler-ui`, sin push)**: gestión completa de cron desde la UI. **Solo frontend** (el backend
+  del Issue #14 ya estaba terminado). Nuevos: `types/scheduler.ts` (`CronSchedule`, params, `ScheduleRunResult`;
+  regla de IDs opacos documentada), `api/scheduler.ts` (cliente de los 7 endpoints, **sin** `buildQuery`
+  porque `GET /scheduler/jobs` **no pagina**: envelope sin `meta`), `lib/datetime.ts`
+  (`formatDateTime` **extraído de `JobsView`** y compartido, con tests propios), `views/SchedulerView.vue`
+  (tabla con primitivas `ui/table`, form en `Card` inline, `<select>` nativo para `command`, borrado con
+  **confirmación en dos pasos** sin `window.confirm`, `viewer` en solo lectura, `IdChip` para el `id` y el
+  `job_id` del run, mensajes con `aria-live`). **Validación del cron partida**: cliente valida **forma**
+  (5 campos, `[0-9A-Za-z*/,-]`), el backend es la autoridad ⇒ un **400 se muestra junto al campo** y el
+  form no se cierra; un **409** al ejecutar mapea a `scheduler.jobRunning`. i18n completo `scheduler.*`
+  ES/EN (EN fuente de verdad). Router: `scheduler` entra en `IMPLEMENTED_ROUTES` ⇒ **solo `admin-logs`
+  sigue en `PlaceholderView`**.
+  Verificado: **333 tests (33 archivos)**, cobertura **95.05% stmts / 86.56% branches / 95.39% funcs /
+  97.24% lines** (sube desde 94.72/85.97), `type-check`/`lint`/`build` ✅. **E2E en vivo** (API directa,
+  proxy de Vite `:5174` y Caddy HTTPS `:8443`): lista vacía ⇒ **`{"data":[]}` (no `null`)**, create ⇒ 201
+  con `next_run_at` calculado, cron inválido y command desconocido ⇒ 400, disable ⇒ `enabled:false` y
+  `next_run_at:null`, enable ⇒ recalculado, run ⇒ 200 con `job_id` opaco, segundo run ⇒ **409**, PUT sin
+  `enabled` ⇒ conserva el valor, DELETE ⇒ 204 y lista vacía después.
 - ✅ **Issue #21 (Job Monitoring & Control) COMPLETADO @ `295a780`+`c56ed97` (22-oct)**: SSE en vivo
   + panel de control. **Backend**: `jobs.Manager` gana un **broker pub/sub** (`internal/jobs/subscribe.go`)
   — canales buffered por suscriptor (cap 8), broadcast **no bloqueante** (un cliente lento descarta el
@@ -199,6 +218,15 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
 - `frontend/` sigue vacío (no trackeado por git); no usar.
 
 ## Decisiones
+- **Charts del Issue #24 interno (Analytics)**: el usuario eligió **Unovis** (`@unovis/vue`, la base de
+  los charts de shadcn-vue). No está instalado todavía: se añade al implementar el dashboard de analítica.
+- **UI del scheduler (Issue #22 interno)**: `GET /scheduler/jobs` **no pagina** ⇒ se usan las primitivas
+  `ui/table` (no `DataTable`, que espera `PagedResult`). El `command` se elige con un **`<select>` nativo**
+  estilado (el registry instalado no tiene `ui/select`) y el form es una `Card` inline (no hay `ui/dialog`).
+  Los `data-test` de fila usan el **índice** (`scheduler-edit-0`), nunca el token opaco: los tokens no son
+  selectores estables; el token íntegro sigue en el `title` del `IdChip`.
+- **Validación del cron**: el cliente valida **solo la forma** (5 campos, `[0-9A-Za-z*/,-]`); la semántica
+  (`cron.ParseStandard`) es del backend, y su **400 se renderiza junto al campo** sin cerrar el formulario.
 - **Numbering de issues**: el numbering de **GitHub lleva un offset (+1)** respecto al interno de
   `docs/ISSUES.md` (existe un "test issue" #1 en GitHub). Mapeo: interno **#16 (SSE)** → GitHub
   **#17** · interno **#17/#18/#19 (frontend setup/auth UI/dashboard)** → GitHub **#18/#19/#20** ·
@@ -377,6 +405,14 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
 - Completar Issues #2+ (migraciones de negocio, frontend).
 
 ## Siguiente paso
+- 🚧 **Issue #22 interno (Scheduler Management UI) IMPLEMENTADO @ `b93cbb7`**, en la rama
+  **`feature/scheduler-ui`** (creada desde `main` `f3d1572`): 1 commit de código + este de memoria.
+  **Push/PR pendientes de autorización explícita**. Al publicar: PR → `main` con `Closes #23`
+  (GitHub; el interno #22) — ojo con el offset de numbering.
+- ⏭️ **Después**: Issue **#24 interno = GitHub #25 (Analytics Dashboard)** con **Unovis** ya decidido
+  (backend listo: `/target/analytics/{summary,top-products,top-customers}`), y Issue **#23 interno =
+  GitHub #24 (Admin Panel)**, que **requiere backend nuevo** (CRUD de usuarios + asignación de roles;
+  hoy solo existe `GET /admin/logs/errors`).
 - ✅ **PR #42 MERGEADO @ `130905c` (22-oct)** — `main` actual. El PR llevó **3 issues en uno**:
   interno **#16 (SSE backend)** → GitHub #17, interno **#20 (Data Tables & Views)** → GitHub #21 e
   interno **#21 (Job Monitoring & Control)** → GitHub #22. 65 archivos / **+7.735 / -60**, 6 commits
