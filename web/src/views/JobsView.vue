@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
 import { useDataList } from '@/composables/useDataList'
 import { useJobEvents } from '@/composables/useJobEvents'
+import { formatDateTime } from '@/lib/datetime'
 import { useAuthStore } from '@/stores/auth'
 import { type DataTableColumn, type PagedResult } from '@/types/data'
 import {
@@ -251,15 +252,12 @@ const historyColumns = computed<DataTableColumn[]>(() => [
   { key: 'error', labelKey: 'jobs.historyError', class: 'min-w-[12rem]' },
 ])
 
-/** Formatea una fecha ISO en algo legible; guion si falta. */
-function formatDate(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—'
-  const date = new Date(String(value))
-  if (Number.isNaN(date.getTime())) return String(value)
-  return date.toLocaleString()
-}
-
-/** Historial con las fechas ya formateadas para la tabla. */
+/**
+ * Historial con las fechas ya formateadas para la tabla.
+ *
+ * `formatDateTime` es el helper compartido (Issue #22): `started_at` es
+ * `string | null` en el contrato, así que se le pasa como `unknown`.
+ */
 const formattedHistory = computed<PagedResult<JobExecution> | null>(() => {
   const result = list.result.value
   if (!result) return null
@@ -267,8 +265,8 @@ const formattedHistory = computed<PagedResult<JobExecution> | null>(() => {
     ...result,
     items: result.items.map((row) => ({
       ...row,
-      started_at: formatDate(row.started_at),
-      finished_at: formatDate(row.finished_at),
+      started_at: formatDateTime(row.started_at),
+      finished_at: formatDateTime(row.finished_at),
     })),
   }
 })
@@ -364,7 +362,7 @@ onMounted(() => {
           </div>
           <div>
             <dt class="text-muted-foreground text-xs">{{ t('jobs.startedAt') }}</dt>
-            <dd class="text-sm" data-test="jobs-started-at">{{ formatDate(status?.started_at) }}</dd>
+            <dd class="text-sm" data-test="jobs-started-at">{{ formatDateTime(status?.started_at) }}</dd>
           </div>
         </dl>
 

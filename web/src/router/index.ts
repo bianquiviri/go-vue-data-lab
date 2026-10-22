@@ -5,14 +5,14 @@ import { useAuthStore } from '@/stores/auth'
 import type { UserRole } from '@/types/auth'
 
 /**
- * Secciones que YA tienen vista propia (Issue #20). El router NO genera
+ * Secciones que YA tienen vista propia (Issues #20 y #22). El router NO genera
  * placeholders para ellas: se declaran explícitamente para controlar el orden
  * (p. ej. `/orders/:id` no debe taparse con nada) y el componente/slot.
  *
- * A medida que los Issues #21-#24 lleguen, las entradas se moverán de los
+ * A medida que los Issues #23-#24 lleguen, las entradas se moverán de los
  * placeholders generados a esta lista.
  */
-const IMPLEMENTED_ROUTES = new Set(['customers', 'products', 'orders', 'target', 'jobs'])
+const IMPLEMENTED_ROUTES = new Set(['customers', 'products', 'orders', 'target', 'jobs', 'scheduler'])
 
 /** Placeholder del dashboard: es la única ruta que no sale de NAV_ITEMS. */
 const PLACEHOLDER_ITEMS = NAV_ITEMS.filter((item) => !IMPLEMENTED_ROUTES.has(item.routeName))
@@ -116,7 +116,15 @@ export const APP_ROUTES: RouteRecordRaw[] = [
         meta: { titleKey: titleKeyOf('jobs') },
       },
 
-      // --- Secciones aún placeholder (Issues #22-#24) ---
+      // --- Scheduler: gestión de cron (Issue #22) ---
+      {
+        path: 'scheduler',
+        name: 'scheduler',
+        component: () => import('@/views/SchedulerView.vue'),
+        meta: { titleKey: titleKeyOf('scheduler') },
+      },
+
+      // --- Secciones aún placeholder (Issues #23-#24) ---
       // Se generan desde NAV_ITEMS (excepto dashboard y las ya implementadas).
       ...PLACEHOLDER_ITEMS.map((item) => ({
         path: item.to.replace(/^\//, ''),
