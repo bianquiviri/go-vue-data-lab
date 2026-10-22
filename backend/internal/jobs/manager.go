@@ -22,6 +22,11 @@ type Manager struct {
 
 	mu      sync.Mutex
 	current *activeJob
+
+	// subs holds the live SSE subscribers. It has its own mutex so a slow
+	// broadcast never contends with mu (the job-state lock); this separation is
+	// what guarantees a slow client can never block the job.
+	subs subscribeState
 }
 
 // activeJob is the in-memory state of the current (or last) job.
@@ -153,7 +158,12 @@ func (m *Manager) Start(ctx context.Context, jobType string, params any) (uuid.U
 	cur.status = StatusRunning
 	cur.startedAt = startedAt
 	cur.cancel = cancel
+	running := cur.progress()
 	m.mu.Unlock()
+
+	// Announce the running state before the first progress tick so subscribers
+	// see the job start.
+	m.broadcast(running)
 
 	go m.run(jobCtx, cur, job)
 	return id, nil
@@ -208,7 +218,11 @@ func (m *Manager) run(ctx context.Context, cur *activeJob, job JobFunc) {
 		Error:      cur.errMsg,
 		Metrics:    marshalMetrics(metrics),
 	}
+	terminal := cur.progress()
 	m.mu.Unlock()
+
+	// Tell subscribers the job ended, then close their streams.
+	m.broadcastTerminal(terminal)
 
 	if uerr := m.repo.Update(context.Background(), exec); uerr != nil {
 		m.log.Error("no se pudo actualizar la ejecución",
@@ -216,10 +230,10 @@ func (m *Manager) run(ctx context.Context, cur *activeJob, job JobFunc) {
 	}
 }
 
-// applyProgress merges a per-entity report into the job's progress.
+// applyProgress merges a per-entity report into the job's progress and
+// broadcasts the new snapshot to every live subscriber.
 func (m *Manager) applyProgress(cur *activeJob, p EntityProgress) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 
 	p.Percent = percentOf(p.Done, p.Total)
 	if _, ok := cur.entities[p.Entity]; !ok {
@@ -239,6 +253,12 @@ func (m *Manager) applyProgress(cur *activeJob, p EntityProgress) {
 	cur.processed = processed
 	cur.failed = failed
 	cur.skipped = skipped
+
+	snapshot := cur.progress()
+	m.mu.Unlock()
+
+	// Broadcast outside m.mu: a slow subscriber must never hold up the job.
+	m.broadcast(snapshot)
 }
 
 // Stop cancels the running job. Its status becomes stopped once the job

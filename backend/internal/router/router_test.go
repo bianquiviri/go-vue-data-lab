@@ -7,11 +7,13 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
+	"github.com/josebianco/go-vue-data-lab/internal/auth"
 	"github.com/josebianco/go-vue-data-lab/internal/domain/models"
 	"github.com/josebianco/go-vue-data-lab/internal/jobs"
 	"github.com/josebianco/go-vue-data-lab/internal/middleware"
@@ -80,6 +82,11 @@ func (stubJobControl) Status() (jobs.JobStatus, error) {
 }
 func (stubJobControl) Progress() (jobs.Progress, error) {
 	return jobs.Progress{Status: jobs.StatusIdle}, nil
+}
+func (stubJobControl) Subscribe(context.Context) <-chan jobs.Progress {
+	ch := make(chan jobs.Progress)
+	close(ch)
+	return ch
 }
 func (stubJobControl) History(context.Context, int, int) ([]models.JobExecution, int64, error) {
 	return []models.JobExecution{}, 0, nil
@@ -452,6 +459,162 @@ func TestRouterJobRoutesRegisteredWithJobs(t *testing.T) {
 	}
 }
 
+func TestRouterSSEMiddlewareAppliedToJobsEventsOnly(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	sseHook := func(c *gin.Context) {
+		c.Header("X-SSE-Hook", "applied")
+		c.Next()
+	}
+	baseHook := func(c *gin.Context) {
+		c.Header("X-Base-Hook", "applied")
+		c.Next()
+	}
+
+	engine := router.New(router.Dependencies{
+		Logger:        zap.NewNop(),
+		Jobs:          stubJobControl{},
+		Middleware:    []gin.HandlerFunc{baseHook},
+		SSEMiddleware: []gin.HandlerFunc{sseHook},
+	})
+
+	eventsRec := get(t, engine, "/api/v1/jobs/events", nil)
+	if eventsRec.Code != http.StatusOK {
+		t.Fatalf("GET /jobs/events: expected %d, got %d (body: %s)", http.StatusOK, eventsRec.Code, eventsRec.Body.String())
+	}
+	if got := eventsRec.Header().Get("X-SSE-Hook"); got != "applied" {
+		t.Errorf("expected the SSE middleware on /jobs/events, got %q", got)
+	}
+	// The SSE route is mounted outside the /jobs group chain: the group guard
+	// must not run on it, otherwise a browser EventSource request (which cannot
+	// send an Authorization header) would be rejected before the SSE guard.
+	if got := eventsRec.Header().Get("X-Base-Hook"); got != "" {
+		t.Errorf("the base middleware must not run on /jobs/events, got %q", got)
+	}
+
+	statusRec := get(t, engine, "/api/v1/jobs/status", nil)
+	if statusRec.Code != http.StatusOK {
+		t.Fatalf("GET /jobs/status: expected %d, got %d", http.StatusOK, statusRec.Code)
+	}
+	if got := statusRec.Header().Get("X-SSE-Hook"); got != "" {
+		t.Errorf("SSE middleware must not run on /jobs/status, got %q", got)
+	}
+	if got := statusRec.Header().Get("X-Base-Hook"); got != "applied" {
+		t.Errorf("expected the base middleware on /jobs/status, got %q", got)
+	}
+}
+
+// TestRouterSSEEventsAcceptsEventSourceQueryToken reproduces the production
+// wiring of cmd/api/main.go: the jobs group carries the bearer guard
+// (middleware.AuthRequired) and the SSE route carries the query-token guard
+// (middleware.AuthRequiredSSE). A browser EventSource cannot send the
+// Authorization header, so the stream must be accepted with ?token= alone.
+func TestRouterSSEEventsAcceptsEventSourceQueryToken(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	tokens := auth.NewJWTManager("router-sse-secret", 15*time.Minute, time.Hour)
+	access, refresh, err := tokens.GenerateTokens(uuid.New(), "root@gmail.com", models.RoleAdmin)
+	if err != nil {
+		t.Fatalf("GenerateTokens() error = %v", err)
+	}
+
+	engine := router.New(router.Dependencies{
+		Logger:        zap.NewNop(),
+		Jobs:          stubJobControl{},
+		Middleware:    []gin.HandlerFunc{middleware.AuthRequired(tokens)},
+		SSEMiddleware: []gin.HandlerFunc{middleware.AuthRequiredSSE(tokens)},
+	})
+
+	rec := get(t, engine, "/api/v1/jobs/events?token="+access, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /jobs/events?token=<access> = %d, want 200 (EventSource cannot send headers); body: %s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("Content-Type"); !strings.HasPrefix(got, "text/event-stream") {
+		t.Errorf("Content-Type = %q, want text/event-stream", got)
+	}
+
+	// A refresh token is never accepted on the stream.
+	refreshRec := get(t, engine, "/api/v1/jobs/events?token="+refresh, nil)
+	if refreshRec.Code != http.StatusUnauthorized {
+		t.Errorf("GET /jobs/events?token=<refresh> = %d, want 401 (body: %s)", refreshRec.Code, refreshRec.Body.String())
+	}
+
+	// A missing or garbage token is rejected too.
+	for _, path := range []string{"/api/v1/jobs/events", "/api/v1/jobs/events?token=not-a-jwt"} {
+		badRec := get(t, engine, path, nil)
+		if badRec.Code != http.StatusUnauthorized {
+			t.Errorf("GET %s = %d, want 401", path, badRec.Code)
+		}
+	}
+}
+
+// TestRouterSSEEventsRouteIsFailClosed asserts the SSE route is never
+// registered open: without any guard the endpoint must not exist at all, and
+// with only the bearer guard it must still reject anonymous requests.
+func TestRouterSSEEventsRouteIsFailClosed(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	unguarded := router.New(router.Dependencies{
+		Logger: zap.NewNop(),
+		Jobs:   stubJobControl{},
+	})
+
+	rec := get(t, unguarded, "/api/v1/jobs/events", nil)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected the SSE route to be unregistered without a guard (%d), got %d", http.StatusNotFound, rec.Code)
+	}
+
+	// Bearer-only fallback: the route exists for non-browser clients but still
+	// requires a token, and it does not accept the ?token= query parameter.
+	tokens := auth.NewJWTManager("router-sse-secret", 15*time.Minute, time.Hour)
+	access, _, err := tokens.GenerateTokens(uuid.New(), "root@gmail.com", models.RoleAdmin)
+	if err != nil {
+		t.Fatalf("GenerateTokens() error = %v", err)
+	}
+
+	engine := router.New(router.Dependencies{
+		Logger:     zap.NewNop(),
+		Jobs:       stubJobControl{},
+		Middleware: []gin.HandlerFunc{middleware.AuthRequired(tokens)},
+	})
+
+	anonRec := get(t, engine, "/api/v1/jobs/events", nil)
+	if anonRec.Code != http.StatusUnauthorized {
+		t.Errorf("GET /jobs/events without a token = %d, want 401", anonRec.Code)
+	}
+	queryRec := get(t, engine, "/api/v1/jobs/events?token="+access, nil)
+	if queryRec.Code != http.StatusUnauthorized {
+		t.Errorf("GET /jobs/events?token=<access> with a bearer-only guard = %d, want 401", queryRec.Code)
+	}
+	headerRec := get(t, engine, "/api/v1/jobs/events", map[string]string{"Authorization": "Bearer " + access})
+	if headerRec.Code != http.StatusOK {
+		t.Errorf("GET /jobs/events with a bearer token = %d, want 200 (body: %s)", headerRec.Code, headerRec.Body.String())
+	}
+}
+
+func TestRouterSSEMiddlewareCanAbortEvents(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	unauthorized := func(c *gin.Context) {
+		c.AbortWithStatus(http.StatusUnauthorized)
+	}
+
+	engine := router.New(router.Dependencies{
+		Logger:        zap.NewNop(),
+		Jobs:          stubJobControl{},
+		SSEMiddleware: []gin.HandlerFunc{unauthorized},
+	})
+
+	rec := get(t, engine, "/api/v1/jobs/events", nil)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected the SSE guard to reject (%d), got %d", http.StatusUnauthorized, rec.Code)
+	}
+	// The other job routes stay untouched by the SSE guard.
+	if rec := get(t, engine, "/api/v1/jobs/status", nil); rec.Code != http.StatusOK {
+		t.Errorf("job status must stay open to the base middleware, got %d", rec.Code)
+	}
+}
+
 func TestRouterJobRoutesAbsentWithoutJobs(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -460,6 +623,11 @@ func TestRouterJobRoutesAbsentWithoutJobs(t *testing.T) {
 	rec := request(t, engine, http.MethodGet, "/api/v1/jobs/status", "")
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected jobs group to be unregistered (%d), got %d", http.StatusNotFound, rec.Code)
+	}
+
+	eventsRec := get(t, engine, "/api/v1/jobs/events", nil)
+	if eventsRec.Code != http.StatusNotFound {
+		t.Fatalf("expected SSE route to be unregistered (%d), got %d", http.StatusNotFound, eventsRec.Code)
 	}
 }
 

@@ -26,32 +26,64 @@ const bearerPrefix = "Bearer "
 // aborts with 401 Unauthorized.
 func AuthRequired(tokens *auth.JWTManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if tokens == nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-			return
-		}
-
-		raw := extractBearer(c.GetHeader("Authorization"))
-		if raw == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing authorization token"})
-			return
-		}
-
-		claims, err := tokens.ValidateToken(raw)
-		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
-			return
-		}
-		if claims.TokenType != auth.TokenTypeAccess {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token type"})
-			return
-		}
-
-		c.Set(ContextUserID, claims.UserID.String())
-		c.Set(ContextEmail, claims.Email)
-		c.Set(ContextRole, string(claims.Role))
-		c.Next()
+		authenticate(c, tokens, extractBearer(c.GetHeader("Authorization")))
 	}
+}
+
+// AuthRequiredSSE is the variant of AuthRequired used by Server-Sent Events
+// endpoints. Browsers' native EventSource cannot set request headers, so the
+// JWT is accepted from the "token" query parameter, with the standard
+// Authorization bearer header kept as a fallback for non-browser clients.
+//
+// Security trade-off: putting a token in the URL means it can leak into access
+// logs, proxy logs, browser history and Referer headers. That is acceptable
+// here only because (a) the endpoint is read-only progress streaming and (b)
+// only short-lived access tokens are accepted — a refresh token is rejected with
+// 401, exactly like AuthRequired. Prefer the header whenever the client can set
+// it; use ?token= only where EventSource forces it. When both are present the
+// query parameter wins, so an invalid explicit token is never masked by a
+// valid header.
+func AuthRequiredSSE(tokens *auth.JWTManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		raw := c.Query("token")
+		if raw == "" {
+			raw = extractBearer(c.GetHeader("Authorization"))
+		} else {
+			raw = extractBearer(raw)
+		}
+		authenticate(c, tokens, raw)
+	}
+}
+
+// authenticate is the shared token-validation core behind AuthRequired and
+// AuthRequiredSSE. It validates the access token and populates the Gin context,
+// or aborts the request with 401 Unauthorized. A nil manager (auth not wired)
+// always denies.
+func authenticate(c *gin.Context, tokens *auth.JWTManager, raw string) {
+	if tokens == nil {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	if raw == "" {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing authorization token"})
+		return
+	}
+
+	claims, err := tokens.ValidateToken(raw)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
+		return
+	}
+	if claims.TokenType != auth.TokenTypeAccess {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token type"})
+		return
+	}
+
+	c.Set(ContextUserID, claims.UserID.String())
+	c.Set(ContextEmail, claims.Email)
+	c.Set(ContextRole, string(claims.Role))
+	c.Next()
 }
 
 // RBAC restricts access to the given roles. It must be attached after

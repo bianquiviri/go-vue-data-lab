@@ -93,6 +93,41 @@
                 }
             }
         },
+        "/jobs/events": {
+            "get": {
+                "description": "Streams job progress as Server-Sent Events. Each frame is `event: progress` followed by `data: \u003cjobs.Progress JSON\u003e`; `job_id` is an opaque v1.* token. A `: ping` comment heartbeat is sent every ~20s while idle. The stream closes when the job finishes (completed/failed/stopped) or the client disconnects. Because the browser EventSource API cannot set headers, the access token is passed as the `?token=` query parameter; refresh tokens are rejected with 401.",
+                "produces": [
+                    "text/event-stream"
+                ],
+                "tags": [
+                    "jobs"
+                ],
+                "summary": "Live job progress (Server-Sent Events)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "JWT access token (EventSource cannot send an Authorization header)",
+                        "name": "token",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "SSE stream",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/jobs/generate/start": {
             "post": {
                 "description": "Launches synthetic data generation into lab_source. Only one job may run at a time.",

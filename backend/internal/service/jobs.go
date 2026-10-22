@@ -34,6 +34,10 @@ type JobControl interface {
 	Status() (jobs.JobStatus, error)
 	// Progress returns the real-time progress of the current job.
 	Progress() (jobs.Progress, error)
+	// Subscribe returns a channel that streams progress events until the job
+	// reaches a terminal state or ctx is cancelled (client disconnected).
+	// It powers the SSE endpoint GET /api/v1/jobs/events.
+	Subscribe(ctx context.Context) <-chan jobs.Progress
 	// History returns a page of past executions plus the total count.
 	History(ctx context.Context, page, perPage int) ([]models.JobExecution, int64, error)
 }
