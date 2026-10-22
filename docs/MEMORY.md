@@ -65,10 +65,10 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
   pasar slot. También se borraron `tsconfig.*.tsbuildinfo` obsoletos (arrastraban un
   `__debug__.spec.ts` ya eliminado y rompían `vue-tsc --build`). Verificado: **110 tests**,
   cobertura **98.35% stmts / 95.34% branches**, `type-check`/`lint`/`build` ✅.
-- ✅ **PRs mergeados**: #40 (`ec11a7e`), **#41** (`c47ddfc`, = `origin/main` actual). El #41 llevó
-  secureid T2 + lint + #38 (paleta) + #39 (landing) + footer/theme-toggle + i18n ES/EN.
-  **PR #42 abierto** (`feature/data-tables-views` → `main`, commit `8c4f937` = Issue #20). `gh release`
-  sigue denegado.
+- ✅ **PRs mergeados**: #40 (`ec11a7e`), **#41** (`c47ddfc`) y **#42** (`130905c`, = `main` actual).
+  El #41 llevó secureid T2 + lint + #38 (paleta) + #39 (landing) + footer/theme-toggle + i18n ES/EN;
+  el **#42** llevó las tablas (#20 interno) + el monitoreo de jobs con SSE (#21 interno) + el endpoint
+  SSE (#16 interno). `gh release` sigue denegado.
 - **main**: PRs #32-#36 mergeados. `make build`, `go test -race ./...`
   y `go vet ./...` en verde.
 - **Hosts locales nuevos** (decisión del usuario, `/etc/hosts` ya actualizado):
@@ -377,22 +377,22 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
 - Completar Issues #2+ (migraciones de negocio, frontend).
 
 ## Siguiente paso
-- ✅ **Issue #21 publicado**: el **PR #42** (`feature/data-tables-views` → `main`) se **actualizó con
-  los 4 commits** del #21 (fast-forward `8c4f937..1b5ec88`, +4.4k líneas) ⇒ el PR lleva
-  **#20 (tablas) + #21 (monitoreo/SSE) + #16 (SSE backend)** en un solo PR. Título actualizado y body
-  reescrito con el mapeo de issues, los 4 bugs corregidos, la verificación y los pendientes.
-  Cierra en GitHub **#17**, **#21** y **#22** al mergear. Estado: **OPEN**, `MERGEABLE`, `mergeStateStatus: CLEAN`,
-  65 archivos / +7.724 / -60. Push autorizado por el usuario (`git push origin feature/data-tables-views`).
+- ✅ **PR #42 MERGEADO @ `130905c` (22-oct)** — `main` actual. El PR llevó **3 issues en uno**:
+  interno **#16 (SSE backend)** → GitHub #17, interno **#20 (Data Tables & Views)** → GitHub #21 e
+  interno **#21 (Job Monitoring & Control)** → GitHub #22. 65 archivos / **+7.735 / -60**, 6 commits
+  (merge commit, mismo estilo que #41). Se publicó haciendo **fast-forward de `feature/data-tables-views`
+  con los 4 commits del #21** (decisión: un solo PR) y reescribiendo título + body con el mapeo de
+  issues, los 4 bugs corregidos, la verificación y los pendientes.
+  **Issues cerrados**: #17, #21, #22 (automático por el `Closes`) y, como limpieza administrativa,
+  **#18** (frontend setup), **#19** (auth UI) y **#20** (dashboard & layout) — ya implementados en
+  PRs previos pero abiertos por el desfase de numbering.
   `gh release` sigue denegado.
-- 🟡 **Issues de GitHub que quedaron abiertos por error de numbering** (ya implementados y mergeados en
-  PRs anteriores, pero nunca cerrados): **#18** (frontend setup), **#19** (authentication UI),
-  **#20** (dashboard & layout) ⇒ cerrar cuando el usuario lo confirme.
 - 🟠 **Decisión pendiente del usuario**: el **percent global retrocede** (100% → 97% → 90%). Fix correcto
   = que el runner declare el plan de entidades con sus totales antes de empezar (cambio de contrato
-  transversal en `jobs.JobFunc`/runners). Abordarlo en #22 o dejarlo documentado.
+  transversal en `jobs.JobFunc`/runners). Abordarlo en el #23 (interno #22) o dejarlo documentado.
 - ✅ **Issue #21 cerrado** (ver "Estado actual"): backend SSE + panel de control en el frontend, con
-  4 bugs corregidos y E2E en vivo verificado.
-- 🚧 **Issue #20 (Data Tables & Views) IMPLEMENTADO @ `8c4f937` (21-oct)** — decisiones del usuario:
+  4 bugs corregidos y E2E en vivo verificado. **Mergeado en `main` vía PR #42**.
+- ✅ **Issue #20 (Data Tables & Views) MERGEADO @ `8c4f937` vía PR #42 (21-oct)** — decisiones del usuario:
   **solo lectura** (sin CRUD de escritura) y tabla con el **`Table` de shadcn-vue** (sin TanStack).
   Nuevos: `types/data.ts` (IDs como `string`), `api/data.ts` (source+target, omite filtros vacíos),
   `composables/useDataList.ts` (paginación+filtros sincronizados con la **query string**, tokens
@@ -407,9 +407,10 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
   branches**, `type-check`/`lint`/`build` ✅; E2E contra el backend vivo: `source/customers` con
   meta y tokens `v1.*`, `GET /customers/{token}` ⇒ 200.
 - ✅ **PR #41 mergeado en `main`** (`c47ddfc`). Issues #37 (i18n ES/EN), #38 (paleta) y #39 (landing)
-  **cerrados en GitHub**. PR **#42** (`feature/data-tables-views` → `main`) **abierto** con el #20.
-- Luego Issues **#22** (scheduler), **#23** (admin logs) y **#24** (analytics), y #25-#31
-  (testing/infra/docs). (landing siempre visible, Issue #38 paleta azul, footer CC + ThemeToggle).
+  **cerrados en GitHub**. **PR #42 mergeado** (`130905c`) con el #20 y el #21 internos.
+- ⏭️ **Siguiente bloque de trabajo**: Issue **#22 interno = GitHub #23 (Scheduler Management UI)**, luego
+  #23 interno = GitHub #24 (Admin Panel) y #24 interno = GitHub #25 (Analytics Dashboard); después
+  #25-#30 internos = GitHub #26-#31 (testing/infra/docs).
   `gh release` sigue denegado. **Ojo**: el PR #40 ya había sido **mergeado** (`ec11a7e`), así que la rama
   siguió creciendo post-merge ⇒ se abrió el **PR #41** (`feature/jobs-scheduler-api` → `main`)
   con los 10 commits acumulados (secureid T2, lint, #38, #39, landing, footer/toggle).
