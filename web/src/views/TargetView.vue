@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import CustomersView from '@/views/CustomersView.vue'
 import ProductsView from '@/views/ProductsView.vue'
 import OrdersView from '@/views/OrdersView.vue'
+import AnalyticsView from '@/views/AnalyticsView.vue'
 import { Button } from '@/components/ui/button'
 
 /**
@@ -15,11 +16,12 @@ import { Button } from '@/components/ui/button'
  * del path (`/target/*`). La pestaña activa es estado local de UI (no afecta a
  * la URL porque cada vista mantiene sus propios filtros en la query string).
  *
- * Analítica agregada (summary/top-products/top-customers) llega en el Issue #24.
+ * Analítica agregada (summary/top-products/top-customers) en la pestaña
+ * `analytics` (Issue #24).
  */
 const { t } = useI18n()
 
-type Tab = 'customers' | 'products' | 'orders'
+type Tab = 'customers' | 'products' | 'orders' | 'analytics'
 
 const activeTab = ref<Tab>('customers')
 
@@ -27,6 +29,7 @@ const TABS = computed<{ value: Tab; label: string }[]>(() => [
   { value: 'customers', label: t('data.customers.title') },
   { value: 'products', label: t('data.products.title') },
   { value: 'orders', label: t('data.orders.title') },
+  { value: 'analytics', label: t('analytics.title') },
 ])
 </script>
 
@@ -54,6 +57,7 @@ const TABS = computed<{ value: Tab; label: string }[]>(() => [
 
     <CustomersView v-if="activeTab === 'customers'" scope="target" />
     <ProductsView v-else-if="activeTab === 'products'" scope="target" />
-    <OrdersView v-else scope="target" />
+    <OrdersView v-else-if="activeTab === 'orders'" scope="target" />
+    <AnalyticsView v-else />
   </div>
 </template>

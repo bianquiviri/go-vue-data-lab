@@ -18,6 +18,8 @@
   },
   "dependencies": {
     "@lucide/vue": "^1.59.0",
+    "@unovis/ts": "^1.7.1",
+    "@unovis/vue": "^1.7.1",
     "@vueuse/core": "^15.0.0",
     "axios": "^1.12.0",
     "class-variance-authority": "^0.7.1",
