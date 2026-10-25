@@ -23,8 +23,11 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
     # Bound to loopback only: the DB is reachable by the host backend, but not
     # exposed to the LAN/internet.
+    # Host port 5433 (not 5432): other local projects ship their own Postgres
+    # on 5432, and Docker refuses to publish a port already in use (the lab
+    # container would start unreachable). Keep DB_PORT in .env in sync.
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
