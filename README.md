@@ -130,8 +130,23 @@ Then open: **https://frontgodata.josebianco.local:8443**
 The full request flow is: browser → Caddy (`:8443`, TLS) →
 `host.docker.internal:5174` → Vite → (`/api` proxy) →
 `host.docker.internal:8080` → Go backend → PostgreSQL. The database is
-reachable only on the host loopback (`127.0.0.1:5432`) and is not exposed to
-your LAN.
+reachable only on the host loopback (`127.0.0.1:5433`, chosen because other
+local projects commonly own 5432) and is not exposed to your LAN. `make
+docker-up` publishes it there; keep `DB_PORT` in `.env` in sync.
+
+#### Port conflicts with other local projects
+
+The lab expects `8080` for the API, but this machine already runs other stacks.
+If `make run` fails with *address already in use*:
+
+```bash
+SERVER_PORT=18080 make run                          # API on :18080
+cd web && VITE_BACKEND_TARGET=http://localhost:18080 npm run dev
+```
+
+Vite then proxies `/api` to `:18080`. Caddy keeps pointing at `:8080`
+(`deploy/Caddyfile`), so the `https://…:8443` entrypoint only reflects the API
+when the backend is actually listening on `8080`.
 
 ### Useful commands
 

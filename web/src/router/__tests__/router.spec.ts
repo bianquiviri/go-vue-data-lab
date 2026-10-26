@@ -191,7 +191,7 @@ describe('router/guards', () => {
     expect(target?.props).toBeUndefined()
   })
 
-  it('jobs tiene vista real y scheduler sigue siendo placeholder', async () => {
+  it('jobs y scheduler tienen vista real (ya no son placeholder)', async () => {
     seedSession()
     const router = createAppRouter()
     await router.push('/jobs')
@@ -202,7 +202,21 @@ describe('router/guards', () => {
     await router.push('/scheduler')
     expect(router.currentRoute.value.name).toBe('scheduler')
     const scheduler = router.getRoutes().find((route) => route.name === 'scheduler')
-    expect(scheduler?.meta.descriptionKey).toBe('nav.scheduler.description')
+    expect(scheduler?.meta.titleKey).toBe('nav.scheduler.title')
+    // Sin `descriptionKey`: esa meta solo la generan los placeholders.
+    expect(scheduler?.meta.descriptionKey).toBeUndefined()
+  })
+
+  it('/scheduler monta la vista real del scheduler (no el placeholder)', async () => {
+    seedSession()
+    server.use(get('/scheduler/jobs', () => json({ data: [] })))
+    const router = createAppRouter()
+    await router.push('/scheduler')
+    await router.isReady()
+    const wrapper = mount(RouterView, { global: { plugins: [router] } })
+    await flushPromises()
+    expect(wrapper.find('[data-test="scheduler-empty"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="placeholder"]').exists()).toBe(false)
   })
 
   it('/jobs monta la vista real de monitoreo (no el placeholder)', async () => {

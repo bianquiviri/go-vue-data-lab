@@ -9,6 +9,7 @@ import { createAppRouter } from '@/router'
 import { useAuthStore } from '@/stores/auth'
 import { makeUser } from '@/__tests__/fixtures'
 import type { Customer } from '@/types/data'
+import type { AnalyticsSummary } from '@/types/analytics'
 
 const CUSTOMER: Customer = {
   id: 'v1.customer-opaque-token',
@@ -18,6 +19,15 @@ const CUSTOMER: Customer = {
   country_code: 'GB',
   city: 'London',
   created_at: '2026-01-01T00:00:00Z',
+}
+
+const SUMMARY: AnalyticsSummary = {
+  total_customers: 10,
+  total_products: 5,
+  total_orders: 20,
+  total_revenue: 1000,
+  average_order_value: 50,
+  orders_by_status: null,
 }
 
 async function mountTarget() {
@@ -88,6 +98,22 @@ describe('views/TargetView', () => {
     await flushPromises()
 
     expect(paths).toContain('/api/v1/target/orders')
+  })
+
+  it('cambia a analytics y muestra el panel', async () => {
+    server.use(
+      get('/target/customers', () => json(pagedEnvelope([CUSTOMER]))),
+      get('/target/analytics/summary', () => json(SUMMARY)),
+      get('/target/analytics/top-products', () => json({ data: [] })),
+      get('/target/analytics/top-customers', () => json({ data: [] })),
+    )
+    const { wrapper } = await mountTarget()
+
+    await wrapper.get('[data-test="target-tab-analytics"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="analytics-view"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Analítica')
   })
 
   it('marca la pestaña activa con aria-selected', async () => {

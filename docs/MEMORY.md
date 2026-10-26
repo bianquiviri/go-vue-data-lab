@@ -4,6 +4,60 @@ Memoria viva del proyecto. Se carga en cada sesión de opencode.
 Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo.
 
 ## Estado actual
+- ✅ **Issue #24 interno (Analytics Dashboard) COMPLETADO @ `44de53d` (25-oct, rama
+  `feature/analytics-dashboard`, sin push)**: pestaña **Analytics** dentro de `/target` (el nav ya se
+  llamaba *Target / Analytics*, así que no se añadió ruta nueva) sobre los tres endpoints de solo
+  lectura del backend (#12). Nuevos: `types/analytics.ts` (contratos + `ANALYTICS_LIMITS` 5/10/20),
+  `api/analytics.ts` (**summary = objeto plano sin envelope**; los top-N con `{"data","meta":{"limit"}}`),
+  `lib/format.ts` (`formatCurrency`/`formatNumber`/`formatCount`/`formatPercent` en USD, locale de i18n),
+  `lib/analytics.ts` (`toStatusSlices`/`statusTotal`/`statusPercent`/`toBarData`/`customerName`,
+  `chartColor` cíclico sobre `--chart-1..5`, tooltips **puros** con escape de HTML),
+  `composables/useAnalytics.ts` (`Promise.allSettled` ⇒ estado **parcial** si falla un endpoint,
+  **guardia de respuestas obsoletas** por número de secuencia, `error` = clave i18n resuelta al render),
+  `components/analytics/{StatusDonut,RevenueBars}.vue` (**Unovis** `VisDonut` + `VisStackedBar`) y
+  `views/AnalyticsView.vue` (5 cards, donut + leyenda con swatches, barras + tabla, top clientes con
+  `IdChip`). i18n completo `analytics.*` ES/EN (fuente EN; **sin** claves muertas).
+  **Bug real encontrado en la verificación en navegador (Chrome + CDP)**: Unovis mapea `x`/`y` a los
+  **ejes de pantalla** y su dominio es **numérico** (`d3.extent`), así que la categoría del chart
+  horizontal debe viajar como **índice** (`x`) con `tickValues`/`tickFormat` y el valor en `y`; con los
+  nombres de producto en la escala **todas las barras salían `MNaN,…`** (no se dibujaba ninguna).
+  Se añadió un **test de regresión** (fuerza `clientWidth/clientHeight` en jsdom, porque Unovis no pinta
+  nada con tamaño 0) que falla con el mapeo viejo y pasa con el nuevo. También se movieron los tooltips
+  a funciones puras (suben la cobertura de los charts de 30% a 100% de ramas) y se silenció el ruido de
+  jsdom (`getContext` de canvas + métricas SVG) en `__tests__/setup.ts`.
+  Verificado: **377 tests (40 archivos)**, cobertura **95.4% stmts / 87.01% branches / 95.41% funcs /
+  97.33% lines**, `type-check`/`lint`/`build` ✅; backend `go build`/`go vet`/`gofmt`/`go test -race`
+  (21 pkgs) ✅. **E2E real** (Chrome headless vía CDP contra API viva): cards `60,100` / `$321,901.38`,
+  donut con 6 colores del tema, 10/20 barras con anchos proporcionales y **0 NaN**, nombres en el eje,
+  leyenda `Paid 63 · 32%`, tablas de 11/21 filas, **0 errores de consola**, y en **oscuro + ES**
+  (`Analítica`, `Clientes 60.100`, `Pagado 63 · 32 %`, color `--chart-1` dark) todo correcto.
+- ✅ **`lab_postgres` publicado en `127.0.0.1:5433` @ `852f558` (25-oct)**: el contenedor se había creado
+  **sin binding al host** porque `control-horario-db` (otro proyecto) ocupaba `5432` ⇒ el backend y
+  `make migrate-up` conectaban a **otra base** y fallaban con `password authentication failed` (Postgres
+  devuelve ese error también cuando el rol no existe). Ahora `deploy/docker-compose.yml` publica
+  `127.0.0.1:5433` y `DB_PORT=5433` en `.env`/`.env.example`. README documenta el puerto y cómo correr
+  el lab si `8080` está ocupado (`SERVER_PORT=18080 make run` + `VITE_BACKEND_TARGET=http://localhost:18080`,
+  ya soportado por `vite.config.ts`); **Caddy sigue apuntando a `:8080`**, así que la URL `:8443` solo
+  refleja la API si el backend escucha ahí.
+- ✅ **Issue #22 interno (Scheduler Management UI) COMPLETADO @ `b93cbb7` (22-oct, rama
+  `feature/scheduler-ui`, sin push)**: gestión completa de cron desde la UI. **Solo frontend** (el backend
+  del Issue #14 ya estaba terminado). Nuevos: `types/scheduler.ts` (`CronSchedule`, params, `ScheduleRunResult`;
+  regla de IDs opacos documentada), `api/scheduler.ts` (cliente de los 7 endpoints, **sin** `buildQuery`
+  porque `GET /scheduler/jobs` **no pagina**: envelope sin `meta`), `lib/datetime.ts`
+  (`formatDateTime` **extraído de `JobsView`** y compartido, con tests propios), `views/SchedulerView.vue`
+  (tabla con primitivas `ui/table`, form en `Card` inline, `<select>` nativo para `command`, borrado con
+  **confirmación en dos pasos** sin `window.confirm`, `viewer` en solo lectura, `IdChip` para el `id` y el
+  `job_id` del run, mensajes con `aria-live`). **Validación del cron partida**: cliente valida **forma**
+  (5 campos, `[0-9A-Za-z*/,-]`), el backend es la autoridad ⇒ un **400 se muestra junto al campo** y el
+  form no se cierra; un **409** al ejecutar mapea a `scheduler.jobRunning`. i18n completo `scheduler.*`
+  ES/EN (EN fuente de verdad). Router: `scheduler` entra en `IMPLEMENTED_ROUTES` ⇒ **solo `admin-logs`
+  sigue en `PlaceholderView`**.
+  Verificado: **333 tests (33 archivos)**, cobertura **95.05% stmts / 86.56% branches / 95.39% funcs /
+  97.24% lines** (sube desde 94.72/85.97), `type-check`/`lint`/`build` ✅. **E2E en vivo** (API directa,
+  proxy de Vite `:5174` y Caddy HTTPS `:8443`): lista vacía ⇒ **`{"data":[]}` (no `null`)**, create ⇒ 201
+  con `next_run_at` calculado, cron inválido y command desconocido ⇒ 400, disable ⇒ `enabled:false` y
+  `next_run_at:null`, enable ⇒ recalculado, run ⇒ 200 con `job_id` opaco, segundo run ⇒ **409**, PUT sin
+  `enabled` ⇒ conserva el valor, DELETE ⇒ 204 y lista vacía después.
 - ✅ **Issue #21 (Job Monitoring & Control) COMPLETADO @ `295a780`+`c56ed97` (22-oct)**: SSE en vivo
   + panel de control. **Backend**: `jobs.Manager` gana un **broker pub/sub** (`internal/jobs/subscribe.go`)
   — canales buffered por suscriptor (cap 8), broadcast **no bloqueante** (un cliente lento descarta el
@@ -199,6 +253,33 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
 - `frontend/` sigue vacío (no trackeado por git); no usar.
 
 ## Decisiones
+- **Analytics (Issue #24 interno)**: la analítica vive como **pestaña dentro de `/target`** (no ruta nueva:
+  el nav ya era *Target / Analytics*). Los tres endpoints se piden en paralelo con `Promise.allSettled`
+  ⇒ si uno falla se muestran los otros y un aviso `analytics.partialError`; si fallan todos, pantalla de
+  error con reintento. `error` se guarda como **clave i18n** y se resuelve en un `computed` (cambia de
+  idioma en caliente). El top-N se re-pide al cambiar el `<select>` (5/10/20) con **guardia de secuencia**
+  para que una respuesta vieja no pise a la nueva.
+- **Unovis (charts)**: `x`/`y` son **ejes de pantalla** y las escalas del contenedor son **numéricas**
+  (`d3.extent`, no hay `scaleBand` fuera de `grouped-bar`) ⇒ en barras horizontales la categoría va como
+  **índice** (`x`) + `tickValues`/`tickFormat` al nombre, y el valor en `y`. Con strings la geometría sale
+  `NaN`. Los charts usan **`--chart-1..5` del tema** (claro/oscuro) vía `chartColor(i)` y
+  **`duration: 0`** (panel que se re-renderiza; además las transiciones de d3 rompen en jsdom).
+  Los tooltips son **funciones puras** en `lib/analytics.ts` (formateo inyectado + escape HTML).
+- **Tests de charts en jsdom**: Unovis mide el contenedor con `clientWidth/Height` (0 en jsdom ⇒ SVG
+  vacío), así que el spec de barras los fuerza para poder afirmar que se dibuja una barra por producto y
+  que no hay `NaN`. `setup.ts` stubbea `getComputedTextLength`/`getBBox` y silencia `getContext` de canvas.
+- **DB del lab en `5433`**: el host `5432` lo ocupa otro proyecto (`control-horario-db`) y Docker no
+  publica un puerto en uso ⇒ el contenedor arrancaba sin binding y el backend hablaba con la base
+  equivocada. `DB_PORT` (env) manda; la URL de Caddy para la API sigue siendo `:8080`.
+- **Charts del Issue #24 interno (Analytics)**: elegido **Unovis** (`@unovis/vue`, la base de los charts
+  de shadcn-vue) e **instalado** en `@unovis/vue` + `@unovis/ts` `^1.7.1`.
+- **UI del scheduler (Issue #22 interno)**: `GET /scheduler/jobs` **no pagina** ⇒ se usan las primitivas
+  `ui/table` (no `DataTable`, que espera `PagedResult`). El `command` se elige con un **`<select>` nativo**
+  estilado (el registry instalado no tiene `ui/select`) y el form es una `Card` inline (no hay `ui/dialog`).
+  Los `data-test` de fila usan el **índice** (`scheduler-edit-0`), nunca el token opaco: los tokens no son
+  selectores estables; el token íntegro sigue en el `title` del `IdChip`.
+- **Validación del cron**: el cliente valida **solo la forma** (5 campos, `[0-9A-Za-z*/,-]`); la semántica
+  (`cron.ParseStandard`) es del backend, y su **400 se renderiza junto al campo** sin cerrar el formulario.
 - **Numbering de issues**: el numbering de **GitHub lleva un offset (+1)** respecto al interno de
   `docs/ISSUES.md` (existe un "test issue" #1 en GitHub). Mapeo: interno **#16 (SSE)** → GitHub
   **#17** · interno **#17/#18/#19 (frontend setup/auth UI/dashboard)** → GitHub **#18/#19/#20** ·
@@ -377,6 +458,19 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
 - Completar Issues #2+ (migraciones de negocio, frontend).
 
 ## Siguiente paso
+- 🚧 **Issue #24 interno (Analytics Dashboard) IMPLEMENTADO @ `44de53d`**, rama
+  **`feature/analytics-dashboard`** (creada desde `feature/scheduler-ui`, que a su vez sale de
+  `main` `f3d1572`). La rama contiene **dos issues completos sin publicar**: #22 interno
+  (`b93cbb7`, scheduler UI) y #24 interno (`44de53d`, analytics), + `852f558` (fix de puerto de
+  la DB) y este commit de memoria. **Al publicar**: decidir si va **un PR único** (rama →
+  `main`, como el #42) o **dos PRs**; los `Closes` deben usar los números de **GitHub**:
+  interno #22 → **#23**, interno #24 → **#25**, recordando el offset (+1).
+- ⏭️ **Después**: Issue **#23 interno = GitHub #24 (Admin Panel)**, que **requiere backend nuevo**
+  (CRUD de usuarios + asignación de roles; hoy solo existe `GET /admin/logs/errors`); después
+  #25-#30 internos = GitHub #26-#31 (testing/infra/docs).
+- ⚠️ **Entorno local**: el backend del lab **no puede usar `:8080`** mientras `control-horario-backend`
+  esté levantado (Caddy proxy a `host.docker.internal:8080`). Para desarrollo se usó
+  `SERVER_PORT=18080` + `VITE_BACKEND_TARGET=http://localhost:18080`.
 - ✅ **PR #42 MERGEADO @ `130905c` (22-oct)** — `main` actual. El PR llevó **3 issues en uno**:
   interno **#16 (SSE backend)** → GitHub #17, interno **#20 (Data Tables & Views)** → GitHub #21 e
   interno **#21 (Job Monitoring & Control)** → GitHub #22. 65 archivos / **+7.735 / -60**, 6 commits
