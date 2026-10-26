@@ -4,8 +4,16 @@ Memoria viva del proyecto. Se carga en cada sesión de opencode.
 Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo.
 
 ## Estado actual
-- ✅ **Issue #24 interno (Analytics Dashboard) COMPLETADO @ `44de53d` (25-oct, rama
-  `feature/analytics-dashboard`, sin push)**: pestaña **Analytics** dentro de `/target` (el nav ya se
+- ✅ **PR #43 MERGEADO @ `27f5e3c` (26-oct)** — `main` actual. El PR llevó **dos issues en uno**
+  (interno **#22 (Scheduler UI)** → GitHub **#23**, interno **#24 (Analytics Dashboard)** → GitHub
+  **#25**) + el fix de puerto de la DB (`852f558`). 36 archivos / **+5.268 / −59**, 5 commits
+  (merge commit, mismo estilo que #41/#42). Ambos issues quedaron **CLOSED** automáticamente.
+  `main` reverificado tras el merge: `make build` + `go test -race` verdes, frontend **377 tests**,
+  `type-check`/`lint`/`build` ✅. `gh release` sigue denegado.
+  **Ramas locales pendientes de limpiar** (todas ya mergeadas): `feature/analytics-dashboard`,
+  `feature/scheduler-ui`, `feature/jobs-scheduler-api`, `wip/jobs-scheduler-api`, `develop`.
+- ✅ **Issue #24 interno (Analytics Dashboard) COMPLETADO @ `44de53d` y MERGEADO en `27f5e3c`
+  (25-26 oct, PR #43)**: pestaña **Analytics** dentro de `/target` (el nav ya se
   llamaba *Target / Analytics*, así que no se añadió ruta nueva) sobre los tres endpoints de solo
   lectura del backend (#12). Nuevos: `types/analytics.ts` (contratos + `ANALYTICS_LIMITS` 5/10/20),
   `api/analytics.ts` (**summary = objeto plano sin envelope**; los top-N con `{"data","meta":{"limit"}}`),
@@ -39,8 +47,8 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
   el lab si `8080` está ocupado (`SERVER_PORT=18080 make run` + `VITE_BACKEND_TARGET=http://localhost:18080`,
   ya soportado por `vite.config.ts`); **Caddy sigue apuntando a `:8080`**, así que la URL `:8443` solo
   refleja la API si el backend escucha ahí.
-- ✅ **Issue #22 interno (Scheduler Management UI) COMPLETADO @ `b93cbb7` (22-oct, rama
-  `feature/scheduler-ui`, sin push)**: gestión completa de cron desde la UI. **Solo frontend** (el backend
+- ✅ **Issue #22 interno (Scheduler Management UI) COMPLETADO @ `b93cbb7` y MERGEADO en `27f5e3c`
+  (22-26 oct, PR #43)**: gestión completa de cron desde la UI. **Solo frontend** (el backend
   del Issue #14 ya estaba terminado). Nuevos: `types/scheduler.ts` (`CronSchedule`, params, `ScheduleRunResult`;
   regla de IDs opacos documentada), `api/scheduler.ts` (cliente de los 7 endpoints, **sin** `buildQuery`
   porque `GET /scheduler/jobs` **no pagina**: envelope sin `meta`), `lib/datetime.ts`
@@ -458,15 +466,12 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
 - Completar Issues #2+ (migraciones de negocio, frontend).
 
 ## Siguiente paso
-- 🚧 **Issue #24 interno (Analytics Dashboard) IMPLEMENTADO @ `44de53d`**, rama
-  **`feature/analytics-dashboard`** (creada desde `feature/scheduler-ui`, que a su vez sale de
-  `main` `f3d1572`). La rama contiene **dos issues completos sin publicar**: #22 interno
-  (`b93cbb7`, scheduler UI) y #24 interno (`44de53d`, analytics), + `852f558` (fix de puerto de
-  la DB) y este commit de memoria. **Al publicar**: decidir si va **un PR único** (rama →
-  `main`, como el #42) o **dos PRs**; los `Closes` deben usar los números de **GitHub**:
-  interno #22 → **#23**, interno #24 → **#25**, recordando el offset (+1).
-- ⏭️ **Después**: Issue **#23 interno = GitHub #24 (Admin Panel)**, que **requiere backend nuevo**
-  (CRUD de usuarios + asignación de roles; hoy solo existe `GET /admin/logs/errors`); después
+- ✅ **PR #43 MERGEADO @ `27f5e3c` (26-oct)** y `main` ya sincronizado en local. Se publicó como
+  **un PR único** (`feature/analytics-dashboard` → `main`, decisión del usuario) con los dos
+  issues + el fix de puerto. Issues **#23** y **#25** de GitHub cerrados; `gh release` sigue
+  denegado. El commit de memoria del PR #43 queda en `main` **sin push** hasta nueva autorización.
+- ⏭️ **Siguiente bloque**: Issue **#23 interno = GitHub #24 (Admin Panel)**, que **requiere backend
+  nuevo** (CRUD de usuarios + asignación de roles; hoy solo existe `GET /admin/logs/errors`); después
   #25-#30 internos = GitHub #26-#31 (testing/infra/docs).
 - ⚠️ **Entorno local**: el backend del lab **no puede usar `:8080`** mientras `control-horario-backend`
   esté levantado (Caddy proxy a `host.docker.internal:8080`). Para desarrollo se usó
