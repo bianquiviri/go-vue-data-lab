@@ -1,4 +1,5 @@
 import { api } from './client'
+import { buildQuery, toPagedResult } from './query'
 import type { ApiEnvelope } from '@/types/api'
 import type {
   Customer,
@@ -23,38 +24,10 @@ import type {
  * ⚠️ IDs OPACOS: cada `id`/`customer_id`/`order_id`/`product_id` es un token
  * cifrado (string). Se interpola en el path y se envía como query param **tal
  * cual**: nunca se parsea ni se transforma. Ver `types/data.ts`.
+ *
+ * La query y la normalización del envelope paginado viven en `api/query.ts`
+ * (compartidas con `api/admin.ts`).
  */
-
-/** Query string solo con valores realmente presentes (omite undefined/''/null). */
-function buildQuery(params?: object): Record<string, string | number> {
-  const query: Record<string, string | number> = {}
-  if (!params) return query
-  for (const [key, value] of Object.entries(params)) {
-    if (value === undefined || value === null || value === '') continue
-    query[key] = value as string | number
-  }
-  return query
-}
-
-/** Normaliza el envelope paginado a un `PagedResult` estable para la UI. */
-function toPagedResult<T>(body: ApiEnvelope<T[]>): PagedResult<T> {
-  const items = Array.isArray(body.data) ? body.data : []
-  const meta = body.meta ?? {}
-  const per_page = typeof meta.per_page === 'number' ? meta.per_page : items.length || 20
-  const total = typeof meta.total === 'number' ? meta.total : items.length
-  return {
-    items,
-    page: typeof meta.page === 'number' ? meta.page : 1,
-    per_page,
-    total,
-    total_pages:
-      typeof meta.total_pages === 'number'
-        ? meta.total_pages
-        : per_page > 0
-          ? Math.ceil(total / per_page)
-          : 0,
-  }
-}
 
 /** Lista clientes paginados de un esquema. */
 export async function listCustomers(

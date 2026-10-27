@@ -56,12 +56,12 @@ describe('views/DashboardView', () => {
     const hrefs = links.map((link) => link.attributes('href'))
     expect(hrefs).toContain('/customers')
     expect(hrefs).toContain('/jobs')
-    expect(hrefs).toContain('/admin/logs')
+    expect(hrefs).toContain('/admin')
   })
 
   it('para un viewer oculta la tarjeta de Admin logs', async () => {
     const { wrapper } = await mountDashboard('viewer')
     const hrefs = wrapper.findAll('a').map((link) => link.attributes('href'))
-    expect(hrefs).not.toContain('/admin/logs')
+    expect(hrefs).not.toContain('/admin')
   })
 })

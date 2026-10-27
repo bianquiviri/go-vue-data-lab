@@ -1,5 +1,24 @@
 basePath: /api/v1
 definitions:
+  handler.AdminStatsEnvelope:
+    properties:
+      data:
+        $ref: '#/definitions/service.AdminStatsSnapshot'
+    type: object
+  handler.AdminUserEnvelope:
+    properties:
+      data:
+        $ref: '#/definitions/models.User'
+    type: object
+  handler.AdminUserListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/models.User'
+        type: array
+      meta:
+        $ref: '#/definitions/handler.PageMeta'
+    type: object
   handler.AnalyticsListResponse:
     properties:
       data: {}
@@ -383,6 +402,31 @@ definitions:
       stock:
         type: integer
     type: object
+  models.User:
+    properties:
+      active:
+        type: boolean
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      role:
+        $ref: '#/definitions/models.UserRole'
+      updated_at:
+        type: string
+    type: object
+  models.UserRole:
+    enum:
+    - admin
+    - operator
+    - viewer
+    type: string
+    x-enum-varnames:
+    - RoleAdmin
+    - RoleOperator
+    - RoleViewer
   scheduler.CreateParams:
     properties:
       command:
@@ -413,6 +457,107 @@ definitions:
     - command
     - cron_expr
     - name
+    type: object
+  service.AdminEntityCounts:
+    properties:
+      customers:
+        type: integer
+      order_items:
+        type: integer
+      orders:
+        type: integer
+      products:
+        type: integer
+    type: object
+  service.AdminJobCounts:
+    properties:
+      by_status:
+        additionalProperties:
+          format: int64
+          type: integer
+        type: object
+      total:
+        type: integer
+    type: object
+  service.AdminScheduleCounts:
+    properties:
+      enabled:
+        type: integer
+      total:
+        type: integer
+    type: object
+  service.AdminServerInfo:
+    properties:
+      go_version:
+        type: string
+      started_at:
+        type: string
+      uptime_seconds:
+        type: integer
+    type: object
+  service.AdminStatsSnapshot:
+    properties:
+      jobs:
+        $ref: '#/definitions/service.AdminJobCounts'
+      schedules:
+        $ref: '#/definitions/service.AdminScheduleCounts'
+      server:
+        $ref: '#/definitions/service.AdminServerInfo'
+      source:
+        $ref: '#/definitions/service.AdminEntityCounts'
+      target:
+        $ref: '#/definitions/service.AdminEntityCounts'
+      users:
+        $ref: '#/definitions/service.AdminStatsUsers'
+    type: object
+  service.AdminStatsUsers:
+    properties:
+      active:
+        type: integer
+      by_role:
+        additionalProperties:
+          format: int64
+          type: integer
+        type: object
+      total:
+        type: integer
+    type: object
+  service.AdminUserCreateInput:
+    properties:
+      active:
+        description: Active defaults to true when omitted.
+        type: boolean
+      email:
+        type: string
+      password:
+        minLength: 8
+        type: string
+      role:
+        enum:
+        - admin
+        - operator
+        - viewer
+        type: string
+    required:
+    - email
+    - password
+    - role
+    type: object
+  service.AdminUserUpdateInput:
+    properties:
+      active:
+        type: boolean
+      email:
+        type: string
+      password:
+        minLength: 8
+        type: string
+      role:
+        enum:
+        - admin
+        - operator
+        - viewer
+        type: string
     type: object
   service.CustomerInput:
     properties:
@@ -516,6 +661,267 @@ paths:
           schema:
             $ref: '#/definitions/handler.ErrorResponse'
       summary: List recent application error logs
+      tags:
+      - admin
+  /admin/stats:
+    get:
+      description: Row counts of both lab schemas, user/job/schedule aggregates and
+        process metadata. Empty tables report 0, never null.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.AdminStatsEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Admin dashboard counters
+      tags:
+      - admin
+  /admin/users:
+    get:
+      description: Returns a page of users (never the password hash). `q` matches
+        the email case-insensitively, `role` filters by RBAC role and `active` by
+        account state.
+      parameters:
+      - description: Page number (1-based)
+        in: query
+        minimum: 1
+        name: page
+        type: integer
+      - description: Items per page (max 100)
+        in: query
+        maximum: 100
+        minimum: 1
+        name: per_page
+        type: integer
+      - description: Email search (case-insensitive)
+        in: query
+        name: q
+        type: string
+      - description: RBAC role
+        enum:
+        - admin
+        - operator
+        - viewer
+        in: query
+        name: role
+        type: string
+      - description: Account state
+        in: query
+        name: active
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.AdminUserListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: List application users
+      tags:
+      - admin
+    post:
+      consumes:
+      - application/json
+      description: Creates a user with an Argon2id password hash. Email is normalized
+        to lower-case and must be unique (409 on duplicates); password must be at
+        least 8 characters and role must be admin, operator or viewer.
+      parameters:
+      - description: User payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/service.AdminUserCreateInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handler.AdminUserEnvelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Create an application user
+      tags:
+      - admin
+  /admin/users/{id}:
+    delete:
+      description: Hard-deletes a user. An admin can neither delete themselves nor
+        the last active admin (409).
+      parameters:
+      - description: User id (opaque token)
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Delete an application user
+      tags:
+      - admin
+    get:
+      description: Returns a single user by opaque id. The password hash is never
+        serialized.
+      parameters:
+      - description: User id (opaque token)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.AdminUserEnvelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Get an application user
+      tags:
+      - admin
+    put:
+      consumes:
+      - application/json
+      description: 'Partially updates a user: every field is optional and nil means
+        unchanged. A provided password is a reset (hashed with Argon2id). An empty
+        payload is rejected with 400 "no changes". Admins can neither disable nor
+        demote themselves (409), and the last active admin can be neither disabled
+        nor demoted (409).'
+      parameters:
+      - description: User id (opaque token)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: User patch payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/service.AdminUserUpdateInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.AdminUserEnvelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Update an application user
       tags:
       - admin
   /health:

@@ -5,17 +5,12 @@ import { useAuthStore } from '@/stores/auth'
 import type { UserRole } from '@/types/auth'
 
 /**
- * Secciones que YA tienen vista propia (Issues #20 y #22). El router NO genera
- * placeholders para ellas: se declaran explícitamente para controlar el orden
- * (p. ej. `/orders/:id` no debe taparse con nada) y el componente/slot.
- *
- * A medida que los Issues #23-#24 lleguen, las entradas se moverán de los
- * placeholders generados a esta lista.
+ * Secciones del panel. TODAS las entradas de `NAV_ITEMS` tienen ya vista real
+ * (Issues #20-#23), así que el router las declara una por una para controlar el
+ * orden de matching (p. ej. `/orders/:id` no debe taparse con nada) y su
+ * componente/meta. Una sección nueva sin vista propia debe declarar aquí su
+ * ruta (o quedará en el catch-all ⇒ landing).
  */
-const IMPLEMENTED_ROUTES = new Set(['customers', 'products', 'orders', 'target', 'jobs', 'scheduler'])
-
-/** Placeholder del dashboard: es la única ruta que no sale de NAV_ITEMS. */
-const PLACEHOLDER_ITEMS = NAV_ITEMS.filter((item) => !IMPLEMENTED_ROUTES.has(item.routeName))
 
 const titleKeyOf = (name: string): string | undefined =>
   NAV_ITEMS.find((item) => item.routeName === name)?.titleKey
@@ -124,18 +119,21 @@ export const APP_ROUTES: RouteRecordRaw[] = [
         meta: { titleKey: titleKeyOf('scheduler') },
       },
 
-      // --- Secciones aún placeholder (Issues #23-#24) ---
-      // Se generan desde NAV_ITEMS (excepto dashboard y las ya implementadas).
-      ...PLACEHOLDER_ITEMS.map((item) => ({
-        path: item.to.replace(/^\//, ''),
-        name: item.routeName,
-        component: () => import('@/views/PlaceholderView.vue'),
-        meta: {
-          titleKey: item.titleKey,
-          descriptionKey: item.descriptionKey,
-          ...(item.roles ? { roles: item.roles satisfies UserRole[] } : {}),
-        },
-      })),
+      // --- Admin: usuarios, logs de error y métricas (Issue #23) ---
+      // Solo `admin`: el guard del router lee `meta.roles` y expulsa al resto
+      // a /dashboard (el backend además responde 403 en todo el grupo).
+      {
+        path: 'admin',
+        name: 'admin',
+        component: () => import('@/views/AdminView.vue'),
+        meta: { titleKey: titleKeyOf('admin'), roles: ['admin'] satisfies UserRole[] },
+      },
+      {
+        // Compatibilidad: la antigua URL de los logs redirige a la pestaña
+        // homónima del panel (evita romper enlaces guardados).
+        path: 'admin/logs',
+        redirect: { name: 'admin' },
+      },
     ],
   },
   {

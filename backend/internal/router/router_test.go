@@ -1002,3 +1002,103 @@ func (stubSourceData) UpdateOrder(context.Context, uuid.UUID, service.OrderUpdat
 	return models.Order{}, nil
 }
 func (stubSourceData) DeleteOrder(context.Context, uuid.UUID) error { return nil }
+
+// stubAdminUsers is a permissive service.AdminUsers fake.
+type stubAdminUsers struct{}
+
+func (stubAdminUsers) List(context.Context, service.AdminUserListParams) (service.PageResult[models.User], error) {
+	return service.PageResult[models.User]{Items: []models.User{}, Page: 1, PerPage: 20}, nil
+}
+func (stubAdminUsers) Get(context.Context, uuid.UUID) (models.User, error) {
+	return models.User{}, nil
+}
+func (stubAdminUsers) Create(context.Context, service.AdminUserCreateInput) (models.User, error) {
+	return models.User{}, nil
+}
+func (stubAdminUsers) Update(context.Context, uuid.UUID, uuid.UUID, service.AdminUserUpdateInput) (models.User, error) {
+	return models.User{}, nil
+}
+func (stubAdminUsers) Delete(context.Context, uuid.UUID, uuid.UUID) error { return nil }
+
+var _ service.AdminUsers = stubAdminUsers{}
+
+// stubAdminStats is a permissive service.AdminStats fake.
+type stubAdminStats struct{}
+
+func (stubAdminStats) Stats(context.Context) (service.AdminStatsSnapshot, error) {
+	return service.AdminStatsSnapshot{}, nil
+}
+
+var _ service.AdminStats = stubAdminStats{}
+
+func TestRouterAdminUserAndStatsRoutesRegisteredWhenGuarded(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	engine := router.New(router.Dependencies{
+		Logger:          zap.NewNop(),
+		AdminUsers:      stubAdminUsers{},
+		AdminStats:      stubAdminStats{},
+		AdminMiddleware: []gin.HandlerFunc{func(c *gin.Context) { c.Next() }},
+	})
+
+	if rec := get(t, engine, "/api/v1/admin/users", nil); rec.Code != http.StatusOK {
+		t.Fatalf("expected the admin users route (%d), got %d (body: %s)", http.StatusOK, rec.Code, rec.Body.String())
+	}
+	if rec := get(t, engine, "/api/v1/admin/stats", nil); rec.Code != http.StatusOK {
+		t.Fatalf("expected the admin stats route (%d), got %d (body: %s)", http.StatusOK, rec.Code, rec.Body.String())
+	}
+}
+
+func TestRouterAdminUserAndStatsRoutesAbsentWithoutGuard(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	engine := router.New(router.Dependencies{
+		Logger:     zap.NewNop(),
+		AdminUsers: stubAdminUsers{},
+		AdminStats: stubAdminStats{},
+	})
+
+	for _, target := range []string{"/api/v1/admin/users", "/api/v1/admin/stats"} {
+		if rec := get(t, engine, target, nil); rec.Code != http.StatusNotFound {
+			t.Errorf("%s must be unregistered without a guard, got %d", target, rec.Code)
+		}
+	}
+}
+
+func TestRouterAdminRoutesAbsentWithoutPorts(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	engine := router.New(router.Dependencies{
+		Logger:          zap.NewNop(),
+		Admin:           stubErrorLogs{},
+		AdminMiddleware: []gin.HandlerFunc{func(c *gin.Context) { c.Next() }},
+	})
+
+	for _, target := range []string{"/api/v1/admin/users", "/api/v1/admin/stats"} {
+		if rec := get(t, engine, target, nil); rec.Code != http.StatusNotFound {
+			t.Errorf("%s must be unregistered without a port, got %d", target, rec.Code)
+		}
+	}
+	if rec := get(t, engine, "/api/v1/admin/logs/errors", nil); rec.Code != http.StatusOK {
+		t.Errorf("the existing logs route must stay registered, got %d", rec.Code)
+	}
+}
+
+func TestRouterAdminUserRoutesUseAdminGuard(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	engine := router.New(router.Dependencies{
+		Logger:     zap.NewNop(),
+		AdminUsers: stubAdminUsers{},
+		AdminStats: stubAdminStats{},
+		AdminMiddleware: []gin.HandlerFunc{
+			func(c *gin.Context) { c.AbortWithStatus(http.StatusForbidden) },
+		},
+	})
+
+	for _, target := range []string{"/api/v1/admin/users", "/api/v1/admin/stats"} {
+		if rec := get(t, engine, target, nil); rec.Code != http.StatusForbidden {
+			t.Errorf("%s must be rejected by the admin guard, got %d", target, rec.Code)
+		}
+	}
+}

@@ -55,13 +55,13 @@ describe('layouts/AppLayout', () => {
 
     expect(titles).toContain('Customers')
     expect(titles).toContain('Jobs')
-    // admin-logs solo es visible para admin (RBAC en nav.ts)
+    // admin solo es visible para admin (RBAC en nav.ts)
     expect(titles).not.toContain('Admin logs')  })
 
   it('un admin ve también Admin logs', async () => {
     const { wrapper } = await mountLayout('admin')
     const titles = wrapper.findAll('[data-test="sidebar"] a').map((link) => link.text())
-    expect(titles).toContain('Admin logs')
+    expect(titles).toContain('Admin')
   })
 
   it('muestra el email y el rol del usuario en el header', async () => {

@@ -83,11 +83,11 @@ export const NAV_ITEMS: NavItem[] = [
     descriptionKey: 'nav.scheduler.description',
   },
   {
-    titleKey: 'nav.adminLogs.title',
-    routeName: 'admin-logs',
-    to: '/admin/logs',
+    titleKey: 'nav.admin.title',
+    routeName: 'admin',
+    to: '/admin',
     icon: ShieldAlert,
-    descriptionKey: 'nav.adminLogs.description',
+    descriptionKey: 'nav.admin.description',
     roles: ['admin'],
   },
 ]

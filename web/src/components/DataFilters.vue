@@ -27,6 +27,13 @@ const props = withDefaults(
     modelValue: Record<string, string>
     /** Soporta búsqueda libre (debounced) sobre el campo `search`. */
     searchable?: boolean
+    /**
+     * Clave de la query string de la búsqueda (default `search`).
+     *
+     * El panel de admin usa `q` porque ese es el nombre del parámetro de
+     * `GET /admin/users`; el resto de listados mantienen `search`.
+     */
+    searchKey?: string
     /** Filtros de tipo select. */
     selects?: SelectFilter[]
     /** Filtros de tipo fecha (date_from/date_to). */
@@ -36,6 +43,7 @@ const props = withDefaults(
   }>(),
   {
     searchable: false,
+    searchKey: 'search',
     selects: () => [],
     dateRange: false,
     debounceMs: 350,
@@ -48,12 +56,12 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-const search = ref(props.modelValue.search ?? '')
+const search = ref(props.modelValue[props.searchKey] ?? '')
 let timer: ReturnType<typeof setTimeout> | null = null
 
 // Mantiene el input sincronizado si la query cambia por fuera (back/forward).
 watch(
-  () => props.modelValue.search,
+  () => props.modelValue[props.searchKey],
   (next) => {
     if ((next ?? '') !== search.value) search.value = next ?? ''
   },
@@ -71,7 +79,7 @@ function onSearchInput(value: string | number): void {
   search.value = String(value)
   if (timer !== null) clearTimeout(timer)
   timer = setTimeout(() => {
-    apply('search', search.value.trim())
+    apply(props.searchKey, search.value.trim())
   }, props.debounceMs)
 }
 

@@ -33,7 +33,7 @@ describe('router/guards', () => {
     const router = createAppRouter()
     await router.push('/admin/logs')
     expect(router.currentRoute.value.name).toBe('login')
-    expect(router.currentRoute.value.query.redirect).toBe('/admin/logs')
+    expect(router.currentRoute.value.query.redirect).toBe('/admin')
   })
 
   it('el dashboard (/dashboard) exige sesión', async () => {
@@ -58,18 +58,18 @@ describe('router/guards', () => {
     expect(router.currentRoute.value.name).toBe('jobs')
   })
 
-  it('un rol sin permisos no entra a /admin/logs', async () => {
+  it('un rol sin permisos no entra a /admin', async () => {
     seedSession('viewer')
     const router = createAppRouter()
-    await router.push('/admin/logs')
+    await router.push('/admin')
     expect(router.currentRoute.value.name).toBe('dashboard')
   })
 
-  it('el rol admin sí entra a /admin/logs', async () => {
+  it('el rol admin sí entra a /admin', async () => {
     seedSession('admin')
     const router = createAppRouter()
-    await router.push('/admin/logs')
-    expect(router.currentRoute.value.name).toBe('admin-logs')
+    await router.push('/admin')
+    expect(router.currentRoute.value.name).toBe('admin')
   })
 
   // --- Landing pública (Issue #39) ---

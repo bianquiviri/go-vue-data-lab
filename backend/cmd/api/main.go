@@ -56,6 +56,10 @@ func main() {
 }
 
 func run() error {
+	// startedAt is the process start instant. It is captured once and used to
+	// derive server.uptime_seconds on every admin dashboard request.
+	startedAt := time.Now().UTC()
+
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("main: load config: %w", err)
@@ -142,6 +146,13 @@ func run() error {
 		Jobs:      jobManager,
 		Scheduler: sched,
 		Admin:     service.NewFileErrorLogs(cfg.LogPath),
+		// Admin panel: user management (lab_target users table) and the
+		// dashboard counters over both database handles.
+		AdminUsers: service.NewAdminUsersService(repository.NewUserAdminRepository(targetDB), hasher),
+		AdminStats: service.NewAdminStatsService(
+			repository.NewAdminStatsRepository(sourceDB, targetDB),
+			startedAt,
+		),
 		// Seal every id in responses and accept only opaque ids inbound.
 		Codec: codec,
 		// Protect the data, jobs and scheduler groups with bearer auth.

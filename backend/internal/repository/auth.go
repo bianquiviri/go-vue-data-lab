@@ -57,14 +57,22 @@ func (r *userRepository) FindByID(ctx context.Context, id uuid.UUID) (*models.Us
 
 func (r *userRepository) Create(ctx context.Context, user *models.User) error {
 	if err := r.db.WithContext(ctx).Create(user).Error; err != nil {
-		return fmt.Errorf("repository: create user %q: %w", user.Email, err)
+		// A duplicate email is a unique violation, mapped to ErrConflict so
+		// the admin API can answer 409 instead of a generic 500.
+		return mapPgError(fmt.Sprintf("create user %q", user.Email), err)
 	}
 	return nil
 }
 
 func (r *userRepository) Update(ctx context.Context, user *models.User) error {
-	if err := r.db.WithContext(ctx).Save(user).Error; err != nil {
-		return fmt.Errorf("repository: update user %q: %w", user.Email, err)
+	res := r.db.WithContext(ctx).Save(user)
+	if res.Error != nil {
+		// Save writes every column, so an email collision is a unique
+		// violation mapped to ErrConflict.
+		return mapPgError(fmt.Sprintf("update user %q", user.Email), res.Error)
+	}
+	if res.RowsAffected == 0 {
+		return wrapNotFound(fmt.Sprintf("update user %q", user.Email), gorm.ErrRecordNotFound)
 	}
 	return nil
 }

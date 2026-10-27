@@ -54,6 +54,15 @@ type Dependencies struct {
 	// guarded, so error logs can never be exposed by default.
 	Admin service.ErrorLogs
 
+	// AdminUsers is the user management port of the admin panel. When nil the
+	// /api/v1/admin/users routes are not registered (same fail-closed rule as
+	// Admin: the group also requires AdminMiddleware).
+	AdminUsers service.AdminUsers
+
+	// AdminStats is the dashboard counters port of the admin panel. When nil
+	// the /api/v1/admin/stats route is not registered.
+	AdminStats service.AdminStats
+
 	// Middleware is an optional hook applied to the /api/v1/source,
 	// /api/v1/target, /api/v1/jobs and /api/v1/scheduler groups only. It
 	// exists so auth/RBAC can be attached later without importing the auth
@@ -302,16 +311,33 @@ func registerSchedulerRoutes(v1 *gin.RouterGroup, deps Dependencies) {
 }
 
 // registerAdminRoutes mounts the admin-only operational endpoints. It is a
-// no-op unless both an admin port and an admin guard are configured, so the
-// error log endpoint can never be registered open.
+// no-op unless an admin guard is configured, and every port is registered
+// individually so a missing collaborator can never expose an open route: the
+// error logs, user management and dashboard endpoints are all fail-closed.
 func registerAdminRoutes(v1 *gin.RouterGroup, deps Dependencies) {
-	if deps.Admin == nil || len(deps.AdminMiddleware) == 0 {
+	if len(deps.AdminMiddleware) == 0 {
 		return
 	}
 
 	admin := v1.Group("/admin")
 	admin.Use(deps.AdminMiddleware...)
 
-	h := handler.NewAdminHandler(deps.Admin)
-	admin.GET("/logs/errors", h.Errors)
+	if deps.Admin != nil {
+		h := handler.NewAdminHandler(deps.Admin)
+		admin.GET("/logs/errors", h.Errors)
+	}
+
+	if deps.AdminUsers != nil {
+		h := handler.NewAdminUsersHandler(deps.AdminUsers)
+		admin.GET("/users", h.ListUsers)
+		admin.GET("/users/:id", h.GetUser)
+		admin.POST("/users", h.CreateUser)
+		admin.PUT("/users/:id", h.UpdateUser)
+		admin.DELETE("/users/:id", h.DeleteUser)
+	}
+
+	if deps.AdminStats != nil {
+		h := handler.NewAdminStatsHandler(deps.AdminStats)
+		admin.GET("/stats", h.Stats)
+	}
 }
