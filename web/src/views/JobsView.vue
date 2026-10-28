@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { AlertTriangle, Play, RefreshCw, Square, WifiOff } from 'lucide-vue-next'
+import { AlertTriangle, Clock, Play, RefreshCw, Square, WifiOff } from 'lucide-vue-next'
 
 import { ApiError } from '@/api/client'
 import { listJobHistory, startGenerate, startMigrate, stopJob } from '@/api/jobs'
@@ -86,6 +86,67 @@ const actionError = ref<string | null>(null)
 const starting = ref(false)
 const stopping = ref(false)
 
+// --- Cronómetro en tiempo real ---
+const now = ref(Date.now())
+let elapsedTimer: ReturnType<typeof setInterval> | null = null
+
+function startElapsedTimer(): void {
+  stopElapsedTimer()
+  now.value = Date.now()
+  elapsedTimer = setInterval(() => {
+    now.value = Date.now()
+  }, 1000)
+}
+
+function stopElapsedTimer(): void {
+  if (elapsedTimer) {
+    clearInterval(elapsedTimer)
+    elapsedTimer = null
+  }
+}
+
+watch(
+  isRunning,
+  (running) => {
+    if (running) {
+      startElapsedTimer()
+    } else {
+      stopElapsedTimer()
+    }
+  },
+  { immediate: true },
+)
+
+const elapsedLabel = computed<string | null>(() => {
+  const startedAt = status.value?.started_at
+  if (!startedAt) return null
+  const startMs = new Date(startedAt).getTime()
+  if (Number.isNaN(startMs)) return null
+
+  let endMs = now.value
+  if (!isRunning.value && status.value?.finished_at) {
+    const finishedMs = new Date(status.value.finished_at).getTime()
+    if (!Number.isNaN(finishedMs)) {
+      endMs = finishedMs
+    }
+  }
+
+  const diffSec = Math.max(0, Math.floor((endMs - startMs) / 1000))
+  const hours = Math.floor(diffSec / 3600)
+  const minutes = Math.floor((diffSec % 3600) / 60)
+  const seconds = diffSec % 60
+
+  const pad = (n: number) => n.toString().padStart(2, '0')
+  if (hours > 0) {
+    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
+  }
+  return `${pad(minutes)}:${pad(seconds)}`
+})
+
+onUnmounted(() => {
+  stopElapsedTimer()
+})
+
 /**
  * Traduce el error del API a un mensaje de UI (409/404 con textos propios).
  * El detalle del backend solo se añade en errores de validación (400/403),
@@ -132,14 +193,12 @@ const genProducts = ref<string | number>('')
 const genOrders = ref<string | number>('')
 const genMinItems = ref<string | number>('')
 const genMaxItems = ref<string | number>('')
-const genBatchSize = ref<string | number>('')
-const genReset = ref(false)
+const genReset = ref(true)
 const genSkipIfExists = ref(false)
 
 // Campos de migración.
 const migEntities = ref<string | number>('')
 const migWorkers = ref<string | number>('')
-const migBatchSize = ref<string | number>('')
 const migExtractSize = ref<string | number>('')
 const migFailFast = ref(false)
 const migStrictTotals = ref(false)
@@ -168,15 +227,13 @@ function buildGenerateParams(): GenerateParams {
   const orders = num(genOrders.value)
   const minItems = num(genMinItems.value)
   const maxItems = num(genMaxItems.value)
-  const batchSize = num(genBatchSize.value)
   if (seed !== undefined) params.seed = seed
   if (customers !== undefined) params.customers = customers
   if (products !== undefined) params.products = products
   if (orders !== undefined) params.orders = orders
   if (minItems !== undefined) params.min_items = minItems
   if (maxItems !== undefined) params.max_items = maxItems
-  if (batchSize !== undefined) params.batch_size = batchSize
-  if (genReset.value) params.reset = true
+  params.reset = genReset.value
   if (genSkipIfExists.value) params.skip_if_exists = true
   return params
 }
@@ -189,11 +246,9 @@ function buildMigrateParams(): MigrateParams {
     .map((value) => value.trim())
     .filter((value) => value !== '')
   const workers = num(migWorkers.value)
-  const batchSize = num(migBatchSize.value)
   const extractSize = num(migExtractSize.value)
   if (entities.length > 0) params.entities = entities
   if (workers !== undefined) params.workers = workers
-  if (batchSize !== undefined) params.batch_size = batchSize
   if (extractSize !== undefined) params.extract_size = extractSize
   if (migFailFast.value) params.fail_fast = true
   if (migStrictTotals.value) params.strict_totals = true
@@ -341,13 +396,20 @@ onMounted(() => {
             {{ stopping ? t('jobs.stopping') : t('jobs.stop') }}
           </Button>
 
-          <div class="ml-auto flex items-center gap-2 text-sm">
-            <span class="text-muted-foreground">{{ t('jobs.statusLabel') }}</span>
-            <StatusBadge
-              :status="statusKind"
-              :label="jobStatusLabel(statusKind)"
-              data-test="jobs-status-badge"
-            />
+          <div class="ml-auto flex flex-wrap items-center gap-4 text-sm">
+            <div v-if="elapsedLabel" class="flex items-center gap-2" data-test="jobs-elapsed">
+              <Clock class="text-muted-foreground size-4" />
+              <span class="text-muted-foreground">{{ t('jobs.elapsed') }}</span>
+              <span class="font-mono font-medium">{{ elapsedLabel }}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-muted-foreground">{{ t('jobs.statusLabel') }}</span>
+              <StatusBadge
+                :status="statusKind"
+                :label="jobStatusLabel(statusKind)"
+                data-test="jobs-status-badge"
+              />
+            </div>
           </div>
         </div>
 
@@ -381,13 +443,15 @@ onMounted(() => {
         <!-- Error de job fallido, destacado -->
         <div
           v-if="jobError || statusKind === 'failed'"
-          class="border-destructive/40 bg-destructive/10 text-destructive flex items-start gap-2 rounded-lg border p-3 text-sm"
+          class="border-destructive/40 bg-destructive/10 text-destructive rounded-lg border p-3 text-sm"
           data-test="jobs-error"
         >
-          <AlertTriangle class="mt-0.5 size-4 shrink-0" />
-          <div>
-            <p class="font-medium">{{ t('jobs.jobError') }}</p>
-            <p data-test="jobs-error-message">{{ jobError ?? '—' }}</p>
+          <div class="flex items-start gap-2">
+            <AlertTriangle class="mt-0.5 size-4 shrink-0" />
+            <div class="min-w-0 flex-1 space-y-1">
+              <p class="font-medium">{{ t('jobs.jobError') }}</p>
+              <p data-test="jobs-error-message" class="break-all whitespace-pre-wrap">{{ jobError ?? '—' }}</p>
+            </div>
           </div>
         </div>
       </CardContent>
@@ -436,10 +500,6 @@ onMounted(() => {
             <span class="text-muted-foreground">{{ t('jobs.params.maxItems') }}</span>
             <Input v-model="genMaxItems" type="number" data-test="jobs-param-max-items" />
           </label>
-          <label class="flex flex-col gap-1 text-xs font-medium">
-            <span class="text-muted-foreground">{{ t('jobs.params.batchSize') }}</span>
-            <Input v-model="genBatchSize" type="number" data-test="jobs-param-batch-size" />
-          </label>
           <label class="flex items-center gap-2 text-xs font-medium">
             <input v-model="genReset" type="checkbox" data-test="jobs-param-reset">
             <span>{{ t('jobs.params.reset') }}</span>
@@ -454,10 +514,6 @@ onMounted(() => {
           <label class="flex flex-col gap-1 text-xs font-medium sm:col-span-3">
             <span class="text-muted-foreground">{{ t('jobs.params.workers') }}</span>
             <Input v-model="migWorkers" type="number" data-test="jobs-param-workers" />
-          </label>
-          <label class="flex flex-col gap-1 text-xs font-medium">
-            <span class="text-muted-foreground">{{ t('jobs.params.batchSize') }}</span>
-            <Input v-model="migBatchSize" type="number" data-test="jobs-param-mig-batch-size" />
           </label>
           <label class="flex flex-col gap-1 text-xs font-medium">
             <span class="text-muted-foreground">{{ t('jobs.params.extractSize') }}</span>

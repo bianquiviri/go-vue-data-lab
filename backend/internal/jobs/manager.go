@@ -13,15 +13,15 @@ import (
 	"github.com/josebianco/go-vue-data-lab/internal/domain/models"
 )
 
-// Manager owns the single active job. It is safe for concurrent use.
+// Manager owns jobs. It is safe for concurrent use.
 type Manager struct {
 	repo    JobRepository
 	runners map[string]RunnerFunc
 	log     *zap.Logger
 	now     func() time.Time
 
-	mu      sync.Mutex
-	current *activeJob
+	mu    sync.RWMutex
+	jobs  map[uuid.UUID]*activeJob
 
 	// subs holds the live SSE subscribers. It has its own mutex so a slow
 	// broadcast never contends with mu (the job-state lock); this separation is
@@ -84,6 +84,7 @@ func New(repo JobRepository, opts ...Option) (*Manager, error) {
 		runners: make(map[string]RunnerFunc),
 		log:     zap.NewNop(),
 		now:     time.Now,
+		jobs:    make(map[uuid.UUID]*activeJob),
 	}
 	for _, opt := range opts {
 		opt(m)
@@ -109,31 +110,18 @@ func (m *Manager) Register(jobType string, runner RunnerFunc) error {
 //
 // The passed context is only used for the initial persistence; the job itself
 // runs on a manager-owned context so it survives the HTTP request that started
-// it. It returns ErrJobRunning when another job is active, ErrUnknownJobType
-// for an unregistered type and ErrInvalidParams when the parameters are
-// invalid.
+// it. ErrUnknownJobType is returned for an unregistered type and ErrInvalidParams
+// when the parameters are invalid.
 func (m *Manager) Start(ctx context.Context, jobType string, params any) (uuid.UUID, error) {
-	m.mu.Lock()
-	if m.current != nil && m.current.isActive() {
-		m.mu.Unlock()
-		return uuid.Nil, fmt.Errorf("jobs: start %s: %w", jobType, ErrJobRunning)
-	}
+	m.mu.RLock()
 	runner, ok := m.runners[jobType]
+	m.mu.RUnlock()
 	if !ok {
-		m.mu.Unlock()
 		return uuid.Nil, fmt.Errorf("jobs: start %s: %w", jobType, ErrUnknownJobType)
 	}
-	// Reserve the slot so concurrent Starts conflict.
-	m.current = &activeJob{
-		jobType:  jobType,
-		status:   StatusPending,
-		entities: make(map[string]EntityProgress),
-	}
-	m.mu.Unlock()
 
 	job, err := runner(params)
 	if err != nil {
-		m.releaseSlot()
 		return uuid.Nil, fmt.Errorf("jobs: start %s: %w", jobType, err)
 	}
 
@@ -146,18 +134,22 @@ func (m *Manager) Start(ctx context.Context, jobType string, params any) (uuid.U
 		StartedAt: startedAt,
 	}
 	if err := m.repo.Create(ctx, exec); err != nil {
-		m.releaseSlot()
 		return uuid.Nil, fmt.Errorf("jobs: persist execution: %w", err)
 	}
 
 	jobCtx, cancel := context.WithCancel(context.Background())
 
+	cur := &activeJob{
+		id:        id,
+		jobType:   jobType,
+		status:    StatusRunning,
+		startedAt: startedAt,
+		cancel:    cancel,
+		entities:  make(map[string]EntityProgress),
+	}
+
 	m.mu.Lock()
-	cur := m.current
-	cur.id = id
-	cur.status = StatusRunning
-	cur.startedAt = startedAt
-	cur.cancel = cancel
+	m.jobs[id] = cur
 	running := cur.progress()
 	m.mu.Unlock()
 
@@ -167,13 +159,6 @@ func (m *Manager) Start(ctx context.Context, jobType string, params any) (uuid.U
 
 	go m.run(jobCtx, cur, job)
 	return id, nil
-}
-
-// releaseSlot clears the reserved slot after a failed Start.
-func (m *Manager) releaseSlot() {
-	m.mu.Lock()
-	m.current = nil
-	m.mu.Unlock()
 }
 
 // run executes the job, recovers panics and persists the terminal state.
@@ -264,41 +249,72 @@ func (m *Manager) applyProgress(cur *activeJob, p EntityProgress) {
 // Stop cancels the running job. Its status becomes stopped once the job
 // goroutine returns. It returns ErrNoRunningJob when nothing is active.
 func (m *Manager) Stop() error {
-	m.mu.Lock()
-	cur := m.current
-	if cur == nil || !cur.isActive() {
-		m.mu.Unlock()
+	m.mu.RLock()
+	var cur *activeJob
+	for _, j := range m.jobs {
+		if j.isActive() {
+			cur = j
+			break
+		}
+	}
+	m.mu.RUnlock()
+
+	if cur == nil {
 		return fmt.Errorf("jobs: stop: %w", ErrNoRunningJob)
 	}
 	cur.stopReq = true
 	cancel := cur.cancel
-	m.mu.Unlock()
-
 	if cancel != nil {
 		cancel()
 	}
 	return nil
 }
 
-// Status returns the current job snapshot, or an idle status when no job has
-// been started.
+// Status returns the snapshot of the most recent/active job, or an idle status
+// when no job has been started.
 func (m *Manager) Status() (JobStatus, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.current == nil {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if len(m.jobs) == 0 {
 		return JobStatus{Status: StatusIdle, Progress: Progress{Status: StatusIdle}}, nil
 	}
-	return m.current.snapshot(), nil
+	var latest *activeJob
+	for _, j := range m.jobs {
+		if latest == nil {
+			latest = j
+			continue
+		}
+		if j.startedAt.After(latest.startedAt) {
+			latest = j
+		}
+	}
+	if latest == nil {
+		return JobStatus{Status: StatusIdle, Progress: Progress{Status: StatusIdle}}, nil
+	}
+	return latest.snapshot(), nil
 }
 
-// Progress returns the real-time progress of the current job.
+// Progress returns the real-time progress of the most recent/active job.
 func (m *Manager) Progress() (Progress, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.current == nil {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if len(m.jobs) == 0 {
 		return Progress{Status: StatusIdle}, nil
 	}
-	return m.current.progress(), nil
+	var latest *activeJob
+	for _, j := range m.jobs {
+		if latest == nil {
+			latest = j
+			continue
+		}
+		if j.startedAt.After(latest.startedAt) {
+			latest = j
+		}
+	}
+	if latest == nil {
+		return Progress{Status: StatusIdle}, nil
+	}
+	return latest.progress(), nil
 }
 
 // History returns a page of past executions (newest first) plus the total.

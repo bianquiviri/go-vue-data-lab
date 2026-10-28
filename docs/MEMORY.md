@@ -4,7 +4,7 @@ Memoria viva del proyecto. Se carga en cada sesión de opencode.
 Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo.
 
 ## Estado actual
-- ✅ **PR #43 MERGEADO @ `27f5e3c` (26-oct)** — `main` actual. El PR llevó **dos issues en uno**
+- ✅ **PR #43 MERGEADO @ `27f5e3c` (26-oct)** — base de `main`. El PR llevó **dos issues en uno**
   (interno **#22 (Scheduler UI)** → GitHub **#23**, interno **#24 (Analytics Dashboard)** → GitHub
   **#25**) + el fix de puerto de la DB (`852f558`). 36 archivos / **+5.268 / −59**, 5 commits
   (merge commit, mismo estilo que #41/#42). Ambos issues quedaron **CLOSED** automáticamente.
@@ -12,6 +12,7 @@ Mantener concisa. Actualizar con `/remember` al cierre de cada bloque de trabajo
   `type-check`/`lint`/`build` ✅. `gh release` sigue denegado.
   **Ramas locales pendientes de limpiar** (todas ya mergeadas): `feature/analytics-dashboard`,
   `feature/scheduler-ui`, `feature/jobs-scheduler-api`, `wip/jobs-scheduler-api`, `develop`.
+- ✅ **Issue #23 interno (Admin Panel) COMPLETADO @ `7e7db82` (28-oct)**: panel de administración con **CRUD de usuarios** + asignación de roles, **estadísticas** y **logs de errores**. **Backend**: repositorio/servicio/handlers en `/api/v1/admin` con **RBAC exclusivo `admin`** (`AuthRequired` + `RBAC(admin)`), CRUD completo para usuarios (`GET/POST/PUT/DELETE`), endpoint de stats y reutilización de `GET /admin/logs/errors`. **Frontend**: nueva vista `AdminView` con secciones *Users / Error logs / Stats*, tabla con acciones (editar/borrar/cambiar rol), formulario con validación, confirmación para borrado, integración con `IdChip`, i18n completo `admin.*` ES/EN. Navegación actualizada para mostrar el panel solo a **admin**. Verificado en local con `make build` y `go test -race ./...`. `gh release` sigue denegado.
 - ✅ **Issue #24 interno (Analytics Dashboard) COMPLETADO @ `44de53d` y MERGEADO en `27f5e3c`
   (25-26 oct, PR #43)**: pestaña **Analytics** dentro de `/target` (el nav ya se
   llamaba *Target / Analytics*, así que no se añadió ruta nueva) sobre los tres endpoints de solo

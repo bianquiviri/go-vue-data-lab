@@ -96,9 +96,28 @@ func DefaultConfig() Config {
 
 // Normalize fills zero-valued fields with defaults so callers can start from a
 // zero Config. Negative values are left untouched for Validate to reject.
+// BatchSize is auto-calculated based on the volume of data to generate when
+// not explicitly set.
 func (c Config) Normalize() Config {
 	if c.BatchSize == 0 {
-		c.BatchSize = DefaultBatchSize
+		total := c.Customers + c.Products + c.Orders
+		switch {
+		case total <= 0:
+			c.BatchSize = 1000
+		case total < 2000:
+			c.BatchSize = 250
+		case total < 10000:
+			c.BatchSize = 500
+		case total < 50000:
+			c.BatchSize = 1000
+		case total < 200000:
+			c.BatchSize = 2000
+		default:
+			c.BatchSize = 3000
+		}
+	}
+	if c.BatchSize > MaxBatchSize {
+		c.BatchSize = MaxBatchSize
 	}
 	if c.MinItems == 0 {
 		c.MinItems = 1

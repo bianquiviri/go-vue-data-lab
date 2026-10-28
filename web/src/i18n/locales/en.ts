@@ -213,6 +213,7 @@ const en = {
     historyName: 'Job',
     historyStatus: 'Status',
     historyStartedAt: 'Started',
+    elapsed: 'Elapsed time',
     historyFinishedAt: 'Finished',
     historyError: 'Error',
     noHistory: 'No executions yet.',

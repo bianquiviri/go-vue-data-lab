@@ -79,6 +79,20 @@ func (g *Generator) Generate(ctx context.Context, store Store, onProgress Progre
 		}
 	}
 
+	// Speed up bulk inserts by dropping non-PK indexes during generation.
+	type indexManager interface {
+		DisableIndexes(context.Context) error
+		RecreateIndexes(context.Context) error
+	}
+	if im, ok := store.(indexManager); ok {
+		if err := im.DisableIndexes(ctx); err != nil {
+			return Summary{}, err
+		}
+		defer func() {
+			_ = im.RecreateIndexes(context.Background())
+		}()
+	}
+
 	// Customers: streamed in batches, IDs are reconstructible by index so no
 	// in-memory list is required.
 	if err := g.persistCustomers(ctx, store, onProgress); err != nil {
@@ -316,12 +330,26 @@ func (g *Generator) persistOrders(ctx context.Context, store Store, products []m
 				}
 			}
 			if len(toInsert) > 0 {
-				if err := saveInBatches(ctx, g.cfg.BatchSize, toInsert, store.SaveOrderItems, nil, EntityOrderItems, totalItems); err != nil {
+				base := processedItems
+				if err := saveInBatches(ctx, g.cfg.BatchSize, toInsert, store.SaveOrderItems, func(_ string, done, total int64) {
+					cur := base + done
+					if cur > total {
+						cur = total
+					}
+					onProgress(EntityOrderItems, cur, total)
+				}, EntityOrderItems, totalItems); err != nil {
 					return err
 				}
+				processedItems = base + int64(len(toInsert))
+			} else {
+				processedItems += int64(len(items))
 			}
+		} else {
+			processedItems += int64(len(items))
 		}
-		processedItems += int64(len(items))
+		if processedItems > totalItems {
+			processedItems = totalItems
+		}
 		onProgress(EntityOrderItems, processedItems, totalItems)
 	}
 	return nil

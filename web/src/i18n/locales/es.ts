@@ -215,6 +215,7 @@ const es: MessageSchema = {
     historyName: 'Job',
     historyStatus: 'Estado',
     historyStartedAt: 'Iniciado',
+    elapsed: 'Tiempo en ejecución',
     historyFinishedAt: 'Finalizado',
     historyError: 'Error',
     noHistory: 'Aún no hay ejecuciones.',

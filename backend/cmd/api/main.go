@@ -21,7 +21,6 @@ import (
 	"github.com/josebianco/go-vue-data-lab/internal/domain/models"
 	"github.com/josebianco/go-vue-data-lab/internal/etl"
 	etlpostgres "github.com/josebianco/go-vue-data-lab/internal/etl/postgres"
-	"github.com/josebianco/go-vue-data-lab/internal/generator"
 	generatorpostgres "github.com/josebianco/go-vue-data-lab/internal/generator/postgres"
 	"github.com/josebianco/go-vue-data-lab/internal/infrastructure/database"
 	"github.com/josebianco/go-vue-data-lab/internal/infrastructure/logger"
@@ -212,7 +211,7 @@ func buildJobManager(log *zap.Logger, sourceDB, targetDB *gorm.DB) (*jobs.Manage
 		return nil, err
 	}
 
-	store, err := generatorpostgres.NewPostgresStore(sourceDB, generator.DefaultBatchSize)
+	store, err := generatorpostgres.NewPostgresStore(sourceDB, 0)
 	if err != nil {
 		return nil, fmt.Errorf("build generator store: %w", err)
 	}

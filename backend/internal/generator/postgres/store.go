@@ -52,7 +52,52 @@ func NewPostgresStore(db *gorm.DB, batchSize int) (*PostgresStore, error) {
 	if batchSize < 1 {
 		batchSize = generator.DefaultBatchSize
 	}
+	if batchSize > 10000 {
+		batchSize = 10000
+	}
 	return &PostgresStore{db: db, batchSize: batchSize}, nil
+}
+
+// DisableIndexes drops non-primary-key indexes to speed up bulk inserts.
+// Only indexes from migrations/source/001_initial are considered; constraints
+// (PK/UNIQUE) are kept.
+func (p *PostgresStore) DisableIndexes(ctx context.Context) error {
+	indexes := []string{
+		"idx_customers_email",
+		"idx_products_sku",
+		"idx_products_category",
+		"idx_orders_customer_id",
+		"idx_orders_order_number",
+		"idx_orders_order_date",
+		"idx_order_items_order_id",
+		"idx_order_items_product_id",
+	}
+	for _, idx := range indexes {
+		if err := p.db.WithContext(ctx).Exec(fmt.Sprintf("DROP INDEX IF EXISTS %s", idx)).Error; err != nil {
+			return fmt.Errorf("generator: drop index %s: %w", idx, err)
+		}
+	}
+	return nil
+}
+
+// RecreateIndexes recreates the indexes after bulk generation.
+func (p *PostgresStore) RecreateIndexes(ctx context.Context) error {
+	stmts := []string{
+		"CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email)",
+		"CREATE INDEX IF NOT EXISTS idx_products_sku ON products(sku)",
+		"CREATE INDEX IF NOT EXISTS idx_products_category ON products(category)",
+		"CREATE INDEX IF NOT EXISTS idx_orders_customer_id ON orders(customer_id)",
+		"CREATE INDEX IF NOT EXISTS idx_orders_order_number ON orders(order_number)",
+		"CREATE INDEX IF NOT EXISTS idx_orders_order_date ON orders(order_date)",
+		"CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id)",
+		"CREATE INDEX IF NOT EXISTS idx_order_items_product_id ON order_items(product_id)",
+	}
+	for _, stmt := range stmts {
+		if err := p.db.WithContext(ctx).Exec(stmt).Error; err != nil {
+			return fmt.Errorf("generator: recreate index: %w", err)
+		}
+	}
+	return nil
 }
 
 // EnsureSchema creates the marker table when missing.
@@ -148,7 +193,9 @@ func (p *PostgresStore) SaveOrders(ctx context.Context, rows []models.Order) ([]
 			return nil, err
 		}
 	}
-	return freshIDs, nil
+	// Always return all order IDs in this batch so order_items can be
+	// generated for newly inserted orders even when run in append mode.
+	return ids, nil
 }
 
 func (p *PostgresStore) insertOrders(ctx context.Context, rows []models.Order) error {
